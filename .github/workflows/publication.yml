@@ -1,0 +1,26 @@
+name: Publication automatique
+on:
+  schedule:
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+
+jobs:
+  publier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests
+      - run: python scripts/publier_citation.py
+        env:
+          PAGE_ACCESS_TOKEN: ${{ secrets.PAGE_ACCESS_TOKEN }}
+          PAGE_ID: ${{ secrets.PAGE_ID }}
+      - name: Sauvegarder la mémoire des publications
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add memoire_publications.json
+          git commit -m "Mise a jour memoire" || echo "rien a commit"
+          git push
