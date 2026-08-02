@@ -26,10 +26,28 @@ def choisir_citation(citations, memoire):
         non_utilisees = citations
     return non_utilisees[0]
 
+def recuperer_image_anilist(titre_manga):
+    query = """
+    query ($search: String) {
+      Media(search: $search, type: MANGA) {
+        coverImage {
+          extraLarge
+        }
+      }
+    }
+    """
+    reponse = requests.post(
+        "https://graphql.anilist.co",
+        json={"query": query, "variables": {"search": titre_manga}}
+    )
+    data = reponse.json()
+    return data["data"]["Media"]["coverImage"]["extraLarge"]
+
 def publier_sur_facebook(citation):
+    image_url = recuperer_image_anilist(citation["manga"])
     url = f"https://graph.facebook.com/v21.0/{PAGE_ID}/photos"
     data = {
-        "url": citation["image_url"],
+        "url": image_url,
         "caption": citation["texte"],
         "access_token": PAGE_ACCESS_TOKEN
     }
