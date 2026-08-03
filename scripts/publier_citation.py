@@ -76,7 +76,6 @@ def creer_image_stylee(image_url, titre_manga):
 
     texte = titre_manga.upper()
 
-    # Centrer le texte en bas de l'image, avec un contour noir pour la lisibilité
     boite = dessin.textbbox((0, 0), texte, font=police)
     largeur_texte = boite[2] - boite[0]
     x = (image.width - largeur_texte) / 2
@@ -94,6 +93,13 @@ def creer_image_stylee(image_url, titre_manga):
     return sortie
 
 
+def styliser_titre(texte):
+    normal = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    stylise = "𝖆𝖇𝖈𝖉𝖊𝖋𝖌𝖍𝖎𝖏𝖐𝖑𝖒𝖓𝖔𝖕𝖖𝖗𝖘𝖙𝖚𝖛𝖜𝖝𝖞𝖟𝕬𝕭𝕮𝕯𝕰𝕱𝕲𝕳𝕴𝕵𝕶𝕷𝕸𝕹𝕺𝕻𝕼𝕽𝕾𝕿𝖀𝖁𝖂𝖃𝖄𝖅"
+    table = str.maketrans(normal, stylise)
+    return texte.translate(table)
+
+
 def publier_sur_facebook(citation):
     image_url = recuperer_image_anilist(citation["manga"])
     if image_url is None:
@@ -102,7 +108,8 @@ def publier_sur_facebook(citation):
 
     image_stylee = creer_image_stylee(image_url, citation["manga"])
 
-    legende = f"🔥📖 {citation['texte']}\n\n⚔️ #{citation['manga'].replace(' ', '')} #manga #anime"
+    titre_stylise = styliser_titre(citation["manga"])
+    legende = f"🔥📖 {titre_stylise}\n\n« {citation['texte']} »\n\n⚔️ #{citation['manga'].replace(' ', '')} #manga #anime"
 
     url = f"https://graph.facebook.com/v21.0/{PAGE_ID}/photos"
     fichiers = {"source": ("image.jpg", image_stylee, "image/jpeg")}
