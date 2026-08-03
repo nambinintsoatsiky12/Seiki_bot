@@ -20,7 +20,7 @@ CALENDRIER = {
 }
 
 PREFIXES = {
-    "citations": "🔥📖", "trivia": "🧐✨", "folklore": "🌙👹",
+    "citations": "🔥📖", "trivia": "🧐✨", "folklore": "✴️🔥",
     "comparatif": "⚖️📺", "portraits": "🖋️👤", "retrospectives": "⏳📚",
 }
 
