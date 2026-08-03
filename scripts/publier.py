@@ -11,7 +11,6 @@ PAGE_ID = os.environ["PAGE_ID"]
 FONT_URL = "https://github.com/google/fonts/raw/main/ofl/bangers/Bangers-Regular.ttf"
 FONT_PATH = "Bangers-Regular.ttf"
 
-# Heure locale (Madagascar, UTC+3) -> catégorie à publier
 CALENDRIER = {
     8: "citations",
     10: "trivia",
@@ -73,7 +72,8 @@ def choisir_entree(entrees, memoire, categorie):
 def recuperer_image_anilist(titre_manga):
     query = """
     query ($search: String) {
-      Media(search: $search, type: MANGA) {
+      Media(search: $search, type: MANGA, isAdult: false) {
+        isAdult
         coverImage { extraLarge }
       }
     }
@@ -84,7 +84,7 @@ def recuperer_image_anilist(titre_manga):
     )
     data = reponse.json()
     media = data.get("data", {}).get("Media")
-    if media is None:
+    if media is None or media.get("isAdult"):
         return None
     return media["coverImage"]["extraLarge"]
 
@@ -133,8 +133,8 @@ def styliser_titre(texte):
 def publier(categorie, entree):
     image_url = recuperer_image_anilist(entree["manga"])
     if image_url is None:
-        print(f"Aucune image trouvée pour {entree['manga']}, publication annulée.")
-        return {"error": "image non trouvee"}
+        print(f"Aucune image trouvée (ou contenu adulte détecté) pour {entree['manga']}, publication annulée.")
+        return {"error": "image non trouvee ou contenu inapproprie"}
 
     image_stylee = creer_image_stylee(image_url, entree["manga"])
     titre_stylise = styliser_titre(entree["manga"])
