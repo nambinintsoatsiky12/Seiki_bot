@@ -48,6 +48,10 @@ def recuperer_image_anilist(titre_manga):
     
 def publier_sur_facebook(citation):
     image_url = recuperer_image_anilist(citation["manga"])
+    if image_url is None:
+        print(f"Aucune image trouvée pour {citation['manga']}, publication annulée pour cette fois.")
+        return {"error": "image non trouvee"}
+
     url = f"https://graph.facebook.com/v21.0/{PAGE_ID}/photos"
     data = {
         "url": image_url,
@@ -56,7 +60,7 @@ def publier_sur_facebook(citation):
     }
     reponse = requests.post(url, data=data)
     return reponse.json()
-
+    
 if __name__ == "__main__":
     citations = charger_citations()
     memoire = charger_memoire()
