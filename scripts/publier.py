@@ -1,5 +1,6 @@
 import json
 import os
+import random
 import requests
 from io import BytesIO
 from datetime import datetime, timezone, timedelta
@@ -34,6 +35,16 @@ PREFIXES = {
     "portraits": "🖋️👤",
     "retrospectives": "⏳📚",
 }
+
+ACCROCHES = [
+    "🚨 ARRÊTE DE SCROLLER 🚨",
+    "😱 ATTENDS VOIR ÇA 😱",
+    "🔥 ÇA VA TE MARQUER 🔥",
+    "👀 REGARDE ÇA DE PRÈS 👀",
+    "⚡ ON EN PARLE ⚡",
+]
+
+EMOJIS_FIN = ["🔥", "😤", "💯", "🥷", "⚔️", "😭", "👑", "🎌"]
 
 
 def categorie_actuelle():
@@ -125,7 +136,12 @@ def creer_image_stylee(image_url, titre_manga):
 
 def styliser_titre(texte):
     normal = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    stylise = "𝖆𝖇𝖈𝖉𝖊𝖋𝖌𝖍𝖎𝖏𝖐𝖑𝖒𝖓𝖔𝖕𝖖𝖗𝖘𝖙𝖚𝖛𝖜𝖝𝖞𝖟𝕬𝕭𝕮𝕯𝕰𝕱𝕲𝕳𝕴𝕵𝕶𝕷𝕸𝕹𝕺𝕻𝕼𝕽𝕾𝕿𝖀𝖁𝖂𝖃𝖄𝖅"
+    styles = [
+        "𝖆𝖇𝖈𝖉𝖊𝖋𝖌𝖍𝖎𝖏𝖐𝖑𝖒𝖓𝖔𝖕𝖖𝖗𝖘𝖙𝖚𝖛𝖜𝖝𝖞𝖟𝕬𝕭𝕮𝕯𝕰𝕱𝕲𝕳𝕴𝕵𝕶𝕷𝕸𝕹𝕺𝕻𝕼𝕽𝕾𝕿𝖀𝖁𝖂𝖃𝖄𝖅",
+        "𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩",
+        "𝗮𝗯𝗰𝗱𝗲𝗳𝗴𝗵𝗶𝗷𝗸𝗹𝗺𝗻𝗼𝗽𝗾𝗿𝘀𝘁𝘂𝘃𝘄𝘅𝘆𝘇𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭",
+    ]
+    stylise = random.choice(styles)
     table = str.maketrans(normal, stylise)
     return texte.translate(table)
 
@@ -139,8 +155,15 @@ def publier(categorie, entree):
     image_stylee = creer_image_stylee(image_url, entree["manga"])
     titre_stylise = styliser_titre(entree["manga"])
     prefixe = PREFIXES.get(categorie, "✨")
+    accroche = random.choice(ACCROCHES)
+    emoji_fin = random.choice(EMOJIS_FIN)
 
-    legende = f"{prefixe} {titre_stylise}\n\n{entree['texte']}\n\n#{entree['manga'].replace(' ', '')} #manga #anime"
+    legende = (
+        f"{accroche}\n\n"
+        f"{prefixe} {titre_stylise}\n\n"
+        f"{entree['texte']}\n\n"
+        f"{emoji_fin} #{entree['manga'].replace(' ', '')} #manga #anime {emoji_fin}"
+    )
 
     url = f"https://graph.facebook.com/v21.0/{PAGE_ID}/photos"
     fichiers = {"source": ("image.jpg", image_stylee, "image/jpeg")}
