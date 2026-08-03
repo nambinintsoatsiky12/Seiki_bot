@@ -41,8 +41,11 @@ def recuperer_image_anilist(titre_manga):
         json={"query": query, "variables": {"search": titre_manga}}
     )
     data = reponse.json()
-    return data["data"]["Media"]["coverImage"]["extraLarge"]
-
+    media = data.get("data", {}).get("Media")
+    if media is None:
+        return None
+    return media["coverImage"]["extraLarge"]
+    
 def publier_sur_facebook(citation):
     image_url = recuperer_image_anilist(citation["manga"])
     url = f"https://graph.facebook.com/v21.0/{PAGE_ID}/photos"
