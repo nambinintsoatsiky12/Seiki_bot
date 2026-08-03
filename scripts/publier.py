@@ -2,6 +2,7 @@ import json
 import os
 import requests
 from io import BytesIO
+from datetime import datetime, timezone, timedelta
 from PIL import Image, ImageDraw, ImageFont
 
 PAGE_ACCESS_TOKEN = os.environ["PAGE_ACCESS_TOKEN"]
@@ -10,9 +11,40 @@ PAGE_ID = os.environ["PAGE_ID"]
 FONT_URL = "https://github.com/google/fonts/raw/main/ofl/bangers/Bangers-Regular.ttf"
 FONT_PATH = "Bangers-Regular.ttf"
 
+# Heure locale (Madagascar, UTC+3) -> catégorie à publier
+CALENDRIER = {
+    8: "citations",
+    10: "trivia",
+    12: "citations",
+    14: "folklore",
+    16: "comparatif",
+    18: "trivia",
+    20: "portraits",
+    22: "citations",
+    0: "retrospectives",
+    2: "folklore",
+    4: "citations",
+    6: "trivia",
+}
 
-def charger_citations():
-    with open("contenu/citations.json", "r", encoding="utf-8") as f:
+PREFIXES = {
+    "citations": "🔥📖",
+    "trivia": "🧐✨",
+    "folklore": "🌙👹",
+    "comparatif": "⚖️📺",
+    "portraits": "🖋️👤",
+    "retrospectives": "⏳📚",
+}
+
+
+def categorie_actuelle():
+    heure_locale = (datetime.now(timezone.utc) + timedelta(hours=3)).hour
+    heure_creneau = min(CALENDRIER.keys(), key=lambda h: abs(h - heure_locale))
+    return CALENDRIER[heure_creneau]
+
+
+def charger_contenu(categorie):
+    with open(f"contenu/{categorie}.json", "r", encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -20,7 +52,7 @@ def charger_memoire():
     if os.path.exists("memoire_publications.json"):
         with open("memoire_publications.json", "r", encoding="utf-8") as f:
             return json.load(f)
-    return {"citations_utilisees": []}
+    return {}
 
 
 def sauvegarder_memoire(memoire):
@@ -28,11 +60,13 @@ def sauvegarder_memoire(memoire):
         json.dump(memoire, f, ensure_ascii=False, indent=2)
 
 
-def choisir_citation(citations, memoire):
-    non_utilisees = [c for c in citations if c["id"] not in memoire["citations_utilisees"]]
+def choisir_entree(entrees, memoire, categorie):
+    deja_utilisees = memoire.get(categorie, [])
+    non_utilisees = [e for e in entrees if e["id"] not in deja_utilisees]
     if not non_utilisees:
-        memoire["citations_utilisees"] = []
-        non_utilisees = citations
+        deja_utilisees = []
+        non_utilisees = entrees
+    memoire[categorie] = deja_utilisees
     return non_utilisees[0]
 
 
@@ -40,9 +74,7 @@ def recuperer_image_anilist(titre_manga):
     query = """
     query ($search: String) {
       Media(search: $search, type: MANGA) {
-        coverImage {
-          extraLarge
-        }
+        coverImage { extraLarge }
       }
     }
     """
@@ -66,14 +98,12 @@ def telecharger_police():
 
 def creer_image_stylee(image_url, titre_manga):
     telecharger_police()
-
     reponse = requests.get(image_url)
     image = Image.open(BytesIO(reponse.content)).convert("RGB")
 
     dessin = ImageDraw.Draw(image)
     taille_police = int(image.width / 10)
     police = ImageFont.truetype(FONT_PATH, taille_police)
-
     texte = titre_manga.upper()
 
     boite = dessin.textbbox((0, 0), texte, font=police)
@@ -100,35 +130,36 @@ def styliser_titre(texte):
     return texte.translate(table)
 
 
-def publier_sur_facebook(citation):
-    image_url = recuperer_image_anilist(citation["manga"])
+def publier(categorie, entree):
+    image_url = recuperer_image_anilist(entree["manga"])
     if image_url is None:
-        print(f"Aucune image trouvée pour {citation['manga']}, publication annulée pour cette fois.")
+        print(f"Aucune image trouvée pour {entree['manga']}, publication annulée.")
         return {"error": "image non trouvee"}
 
-    image_stylee = creer_image_stylee(image_url, citation["manga"])
+    image_stylee = creer_image_stylee(image_url, entree["manga"])
+    titre_stylise = styliser_titre(entree["manga"])
+    prefixe = PREFIXES.get(categorie, "✨")
 
-    titre_stylise = styliser_titre(citation["manga"])
-    legende = f"🔥📖 {titre_stylise}\n\n« {citation['texte']} »\n\n⚔️ #{citation['manga'].replace(' ', '')} #manga #anime"
+    legende = f"{prefixe} {titre_stylise}\n\n{entree['texte']}\n\n#{entree['manga'].replace(' ', '')} #manga #anime"
 
     url = f"https://graph.facebook.com/v21.0/{PAGE_ID}/photos"
     fichiers = {"source": ("image.jpg", image_stylee, "image/jpeg")}
-    data = {
-        "caption": legende,
-        "access_token": PAGE_ACCESS_TOKEN
-    }
+    data = {"caption": legende, "access_token": PAGE_ACCESS_TOKEN}
     reponse = requests.post(url, data=data, files=fichiers)
     return reponse.json()
 
 
 if __name__ == "__main__":
-    citations = charger_citations()
-    memoire = charger_memoire()
-    citation = choisir_citation(citations, memoire)
+    categorie = categorie_actuelle()
+    print(f"Catégorie choisie pour ce créneau : {categorie}")
 
-    resultat = publier_sur_facebook(citation)
+    contenu = charger_contenu(categorie)
+    memoire = charger_memoire()
+    entree = choisir_entree(contenu, memoire, categorie)
+
+    resultat = publier(categorie, entree)
     print("Résultat Facebook:", resultat)
 
     if "error" not in resultat:
-        memoire["citations_utilisees"].append(citation["id"])
+        memoire.setdefault(categorie, []).append(entree["id"])
         sauvegarder_memoire(memoire)
