@@ -137,21 +137,24 @@ def publier_reel(manga, legende):
     # Pause de 15 secondes pour laisser le temps à Meta de traiter le fichier
     print("Attente du traitement vidéo par Meta...")
     time.sleep(15)
-
-    # 3. Finish (Publication effective)
+    
+# 3. Finish (Publication publique immédiate)
     r3 = requests.post(
         f"https://graph.facebook.com/v21.0/{PAGE_ID}/video_reels",
+        params={
+            "access_token": PAGE_ACCESS_TOKEN
+        },
         data={
             "upload_phase": "finish",
             "video_id": video_id,
             "video_state": "PUBLISHED",
-            "description": legende,
-            "access_token": PAGE_ACCESS_TOKEN
+            "published": "true",          # <--- Force la visibilité publique
+            "description": legende
         }
     )
     print("Résultat publication finale:", r3.json())
-    return r3.json()
-if __name__ == "__main__":
+
+   if __name__ == "__main__":
     manga = manga_de_la_semaine()
     print("Manga de la semaine :", manga)
 
