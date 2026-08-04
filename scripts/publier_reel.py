@@ -103,21 +103,27 @@ def creer_video():
         "reel.mp4"
     ]
     subprocess.run(commande, check=True)
-    
+
 def publier_reel(manga, legende):
     taille = os.path.getsize("reel.mp4")
-
+    
+    # 1. Start (Initialisation)
     r = requests.post(
         f"https://graph.facebook.com/v21.0/{PAGE_ID}/video_reels",
         data={"upload_phase": "start", "access_token": PAGE_ACCESS_TOKEN}
     )
     depart = r.json()
-    video_id = depart["video_id"]
-    upload_url = depart["upload_url"]
+    video_id = depart.get("video_id")
+    upload_url = depart.get("upload_url")
+    
+    if not video_id or not upload_url:
+        print("Erreur initialisation Facebook:", depart)
+        return depart
 
+    # 2. Upload de la vidéo
     with open("reel.mp4", "rb") as f:
         contenu = f.read()
-
+        
     r2 = requests.post(
         upload_url,
         headers={
@@ -128,17 +134,11 @@ def publier_reel(manga, legende):
     )
     print("Résultat upload:", r2.json())
 
-    for _ in range(10):
-        time.sleep(5)
-        statut = requests.get(
-            f"https://graph.facebook.com/v21.0/{video_id}",
-            params={"fields": "status", "access_token": PAGE_ACCESS_TOKEN}
-        ).json()
-        etat = statut.get("status", {}).get("video_status")
-        print("Statut vidéo:", etat)
-        if etat == "ready":
-            break
+    # Pause de 15 secondes pour laisser le temps à Meta de traiter le fichier
+    print("Attente du traitement vidéo par Meta...")
+    time.sleep(15)
 
+    # 3. Finish (Publication effective)
     r3 = requests.post(
         f"https://graph.facebook.com/v21.0/{PAGE_ID}/video_reels",
         data={
