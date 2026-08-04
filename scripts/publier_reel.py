@@ -133,17 +133,17 @@ def publier_reel(manga, legende):
             break
 
     r3 = requests.post(
-        f"https://graph.facebook.com/v21.0/{PAGE_ID}/video_reels",
-        data={
-            "upload_phase": "finish",
-            "video_id": video_id,
-            "video_state": "PUBLISHED",
-            "description": legende,
-            "access_token": PAGE_ACCESS_TOKEN
-        }
-    )
-    return r3.json()
-
+    f"https://graph.facebook.com/v21.0/{PAGE_ID}/video_reels",
+    data={
+        "upload_phase": "finish",
+        "video_id": video_id,
+        "video_state": "PUBLISHED",
+        "description": legende,
+        "access_token": PAGE_ACCESS_TOKEN
+    }
+)
+print("Résultat publication finale:", r3.json())
+return r3.json()
 
 if __name__ == "__main__":
     manga = manga_de_la_semaine()
