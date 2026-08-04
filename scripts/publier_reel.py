@@ -87,34 +87,44 @@ def generer_texte_reel(manga):
         return f"On parle de {manga} aujourd'hui 🔥 Vous en pensez quoi ? 👇"
 
 def creer_video():
-    # 1. Télécharge la meilleure vidéo MP4 qui inclut déjà le son
+    # 1. Télécharge la vidéo avec yt-dlp
     cmd_yt = [
         "yt-dlp",
         "ytsearch1:One Piece fight short",
         "--max-filesize", "50M",
         "-f", "mp4",
         "--no-playlist",
-        "--compat-options", "no-direct-merge",
         "-o", "source.mp4"
     ]
-    # 2. Recadrage FFmpeg 100% blindé
+    subprocess.run(cmd_yt, check=True)
+
+    # 2. Recadrage FFmpeg avec génération d'audio si absent
     cmd_ffmpeg = [
         "ffmpeg", "-y",
         "-i", "source.mp4",
+        "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
         "-t", "30",
         "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
         "-c:v", "libx264",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac",
-        "-b:a", "128k",
+        "-shortest",
         "reel.mp4"
     ]
-    # Nettoyage
+    subprocess.run(cmd_ffmpeg, check=True)
+
     if os.path.exists("source.mp4"):
         os.remove("source.mp4")
         
 def publier_reel(manga, legende):
-    taille = os.path.getsize("reel.mp4")
+    # Génère la vidéo
+    creer_video()
+
+    # Vérifie que le fichier existe avant de lire sa taille
+    if not os.path.exists("reel.mp4"):
+        raise FileNotFoundError("La création de reel.mp4 a échoué.")
+        taille = os.path.getsize("reel.mp4")
+    
     
     # 1. Start (Initialisation)
     r = requests.post(
