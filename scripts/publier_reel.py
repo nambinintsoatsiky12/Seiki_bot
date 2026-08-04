@@ -89,20 +89,24 @@ def generer_texte_reel(manga):
 
 def creer_video():
     commande = [
-        "ffmpeg", "-y",
-        "-loop", "1",
-        "-i", "frame.jpg",
-        "-f", "lavfi",
-        "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
-        "-vf", "zoompan=z='min(zoom+0.0012,1.15)':d=200:s=1080x1920:fps=25,format=yuv420p",
-        "-t", "8",
-        "-c:v", "libx264",
-        "-c:a", "aac",
-        "-shortest",
-        "reel.mp4"
-    ]
-    subprocess.run(commande, check=True)
-    
+    "ffmpeg", "-y",
+    "-loop", "1",
+    "-i", "frame.jpg",
+    "-f", "lavfi",
+    "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+    "-filter_complex", "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,zoompan=z='min(zoom+0.0012,1.15)':d=200:s=1080x1920:fps=25[v]",
+    "-map", "[v]",
+    "-map", "1:a",
+    "-t", "8",
+    "-c:v", "libx264",
+    "-pix_fmt", "yuv420p",
+    "-profile:v", "main",
+    "-level:v", "4.0",
+    "-c:a", "aac",
+    "-b:a", "128k",
+    "-movflags", "+faststart",
+    "reel.mp4"
+        ]    
 def publier_reel(manga, legende):
     taille = os.path.getsize("reel.mp4")
 
