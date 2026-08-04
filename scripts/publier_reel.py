@@ -87,23 +87,34 @@ def generer_texte_reel(manga):
         return f"On parle de {manga} aujourd'hui 🔥 Vous en pensez quoi ? 👇"
 
 def creer_video():
-    commande = [
+    # 1. Télécharge un clip court sur YouTube
+    cmd_yt = [
+        "yt-dlp",
+        "ytsearch1:One Piece fight short",
+        "--max-filesize", "50M",
+        "-f", "mp4",
+        "-o", "source.mp4"
+    ]
+    print("Téléchargement du clip vidéo...")
+    subprocess.run(cmd_yt, check=True)
+
+    # 2. Recadrage au format Reel (9:16 vertical)
+    cmd_ffmpeg = [
         "ffmpeg", "-y",
-        "-loop", "1",
-        "-i", "frame.jpg",
-        "-f", "lavfi",
-        "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
-        "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,zoompan=z='min(zoom+0.0015,1.15)':d=200:s=1080x1920:fps=25",
-        "-t", "8",
+        "-i", "source.mp4",
+        "-t", "30",
+        "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
         "-c:v", "libx264",
-        "-pix_fmt", "yuv420p",
         "-c:a", "aac",
-        "-shortest",
-        "-movflags", "+faststart",
         "reel.mp4"
     ]
-    subprocess.run(commande, check=True)
+    print("Mise au format vertical...")
+    subprocess.run(cmd_ffmpeg, check=True)
 
+    # Nettoyage du fichier temporaire
+    if os.path.exists("source.mp4"):
+        os.remove("source.mp4")
+        
 def publier_reel(manga, legende):
     taille = os.path.getsize("reel.mp4")
     
