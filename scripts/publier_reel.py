@@ -87,16 +87,19 @@ def generer_texte_reel(manga):
         return f"On parle de {manga} aujourd'hui 🔥 Vous en pensez quoi ? 👇"
 
 def creer_video():
-    # 1. Télécharge un clip court sur YouTube
+    # 1. Télécharge la meilleure vidéo MP4 qui inclut déjà le son
     cmd_yt = [
         "yt-dlp",
         "ytsearch1:One Piece fight short",
         "--max-filesize", "50M",
-        "-f", "b[ext=mp4]/best", # Trouve le meilleur format MP4 disponible
+        "-f", "b[ext=mp4]/b/bv*+ba", # Trouve du MP4 vidéo+audio
         "--no-playlist",
         "-o", "source.mp4"
-]
-    # 2. Recadrage au format Reel (9:16 vertical)
+    ]
+    print("Téléchargement de la vidéo...")
+    subprocess.run(cmd_yt, check=True)
+
+    # 2. Recadrage FFmpeg sécurisé
     cmd_ffmpeg = [
         "ffmpeg", "-y",
         "-i", "source.mp4",
@@ -104,12 +107,13 @@ def creer_video():
         "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
         "-c:v", "libx264",
         "-c:a", "aac",
+        "-strict", "experimental",
         "reel.mp4"
     ]
     print("Mise au format vertical...")
     subprocess.run(cmd_ffmpeg, check=True)
 
-    # Nettoyage du fichier temporaire
+    # Nettoyage
     if os.path.exists("source.mp4"):
         os.remove("source.mp4")
         
