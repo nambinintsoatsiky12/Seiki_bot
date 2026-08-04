@@ -121,6 +121,8 @@ def publier_reel(manga, legende):
         return depart
 
     # 2. Upload de la vidéo
+    taille = os.path.getsize("reel.mp4")
+    
     with open("reel.mp4", "rb") as f:
         contenu = f.read()
         
@@ -128,12 +130,12 @@ def publier_reel(manga, legende):
         upload_url,
         headers={
             "Authorization": f"OAuth {PAGE_ACCESS_TOKEN}",
-            "file_offset": "0"
+            "offset": "0",
+            "file_size": str(taille)
         },
         data=contenu
     )
     print("Résultat upload:", r2.json())
-
     # Pause de 15 secondes pour laisser le temps à Meta de traiter le fichier
     print("Attente du traitement vidéo par Meta...")
     time.sleep(15)
