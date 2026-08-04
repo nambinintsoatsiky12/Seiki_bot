@@ -92,13 +92,11 @@ def creer_video():
         "yt-dlp",
         "ytsearch1:One Piece fight short",
         "--max-filesize", "50M",
-        "-f", "b[ext=mp4]/b/bv*+ba", # Trouve du MP4 vidéo+audio
+        "-f", "mp4",
         "--no-playlist",
+        "--compat-options", "no-direct-merge",
         "-o", "source.mp4"
     ]
-    print("Téléchargement de la vidéo...")
-    subprocess.run(cmd_yt, check=True)
-
     # 2. Recadrage FFmpeg sécurisé
     cmd_ffmpeg = [
         "ffmpeg", "-y",
