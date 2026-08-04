@@ -97,20 +97,18 @@ def creer_video():
         "--compat-options", "no-direct-merge",
         "-o", "source.mp4"
     ]
-    # 2. Recadrage FFmpeg sécurisé
+    # 2. Recadrage FFmpeg 100% blindé
     cmd_ffmpeg = [
         "ffmpeg", "-y",
         "-i", "source.mp4",
         "-t", "30",
         "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
         "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
         "-c:a", "aac",
-        "-strict", "experimental",
+        "-b:a", "128k",
         "reel.mp4"
     ]
-    print("Mise au format vertical...")
-    subprocess.run(cmd_ffmpeg, check=True)
-
     # Nettoyage
     if os.path.exists("source.mp4"):
         os.remove("source.mp4")
