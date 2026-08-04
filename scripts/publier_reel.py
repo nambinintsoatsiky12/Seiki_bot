@@ -92,12 +92,10 @@ def creer_video():
         "yt-dlp",
         "ytsearch1:One Piece fight short",
         "--max-filesize", "50M",
-        "-f", "mp4",
+        "-f", "b[ext=mp4]/best", # Trouve le meilleur format MP4 disponible
+        "--no-playlist",
         "-o", "source.mp4"
-    ]
-    print("Téléchargement du clip vidéo...")
-    subprocess.run(cmd_yt, check=True)
-
+]
     # 2. Recadrage au format Reel (9:16 vertical)
     cmd_ffmpeg = [
         "ffmpeg", "-y",
