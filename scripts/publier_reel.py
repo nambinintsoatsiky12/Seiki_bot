@@ -153,7 +153,7 @@ def publier_reel(manga, legende):
         }
     )
     print("Résultat publication finale:", r3.json())
-   if __name__ == "__main__":
+if __name__ == "__main__":
     manga = manga_de_la_semaine()
     print("Manga de la semaine :", manga)
 
