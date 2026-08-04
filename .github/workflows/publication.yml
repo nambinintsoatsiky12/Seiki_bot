@@ -17,6 +17,7 @@ jobs:
         env:
           PAGE_ACCESS_TOKEN: ${{ secrets.PAGE_ACCESS_TOKEN }}
           PAGE_ID: ${{ secrets.PAGE_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       - name: Sauvegarder la mémoire des publications
         run: |
           git config user.name "github-actions"
