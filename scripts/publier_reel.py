@@ -138,21 +138,26 @@ def publier_reel(manga, legende):
     print("Attente du traitement vidéo par Meta...")
     time.sleep(15)
     
-# 3. Finish (Publication publique immédiate)
+# 3. Finish (Publication)
     r3 = requests.post(
         f"https://graph.facebook.com/v21.0/{PAGE_ID}/video_reels",
-        params={
-            "access_token": PAGE_ACCESS_TOKEN
-        },
+        params={"access_token": PAGE_ACCESS_TOKEN},
         data={
             "upload_phase": "finish",
             "video_id": video_id,
             "video_state": "PUBLISHED",
-            "published": "true",          # <--- Force la visibilité publique
+            "published": "true",
             "description": legende
         }
     )
-    print("Résultat publication finale:", r3.json())
+    
+    reponse = r3.json()
+    print("REPONSE DE META :", reponse) # <-- Regarde cette ligne dans les logs !
+    
+    if "error" in reponse:
+        raise Exception(f"Meta a refusé le Reel : {reponse['error']}")
+        
+    return reponse
 if __name__ == "__main__":
     manga = manga_de_la_semaine()
     print("Manga de la semaine :", manga)
