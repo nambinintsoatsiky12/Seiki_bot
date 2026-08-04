@@ -13,7 +13,7 @@ jobs:
         with:
           python-version: '3.11'
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg
-      - run: pip install requests pillow
+      - run: pip install requests pillow yt-dlp
       - run: python scripts/publier_reel.py
         env:
           PAGE_ACCESS_TOKEN: ${{ secrets.PAGE_ACCESS_TOKEN }}
