@@ -87,12 +87,26 @@ def generer_texte_reel(manga):
         return f"On parle de {manga} aujourd'hui 🔥 Vous en pensez quoi ? 👇"
 
 def creer_video():
-    print("Génération de la vidéo Reels en direct...")
+    print("Téléchargement d'un vrai clip vidéo...")
+    
+    # Lien direct vers une vraie vidéo MP4 HD (dynamique)
+    url = "https://cdn.pixabay.com/video/2020/05/25/40149-425126838_tiny.mp4"
+    
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    req = requests.get(url, headers=headers, timeout=15)
+    
+    with open("source.mp4", "wb") as f:
+        f.write(req.content)
+
+    print("Mise au format vertical 9:16 + Ajout d'une bande son...")
+    
+    # FFmpeg recadre en Reel (1080x1920) et injecte du son propre
     cmd_ffmpeg = [
         "ffmpeg", "-y",
-        "-f", "lavfi", "-i", "color=c=0x1a1a2e:s=1080x1920:d=10",
+        "-i", "source.mp4",
         "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
-        "-vf", "drawtext=text='ONE PIECE REEL':fontcolor=white:fontsize=70:x=(w-text_w)/2:y=(h-text_h)/2",
+        "-t", "15",
+        "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
         "-c:v", "libx264",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac",
@@ -100,21 +114,10 @@ def creer_video():
         "reel.mp4"
     ]
     subprocess.run(cmd_ffmpeg, check=True)
-    
-    if not os.path.exists("reel.mp4"):
-        raise FileNotFoundError("La création du Reel a échoué")
-    # Adapt au format Reel (1080x1920)
-    cmd_ffmpeg = [
-        "ffmpeg", "-y",
-        "-i", "source.mp4",
-        "-t", "30",
-        "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
-        "-c:v", "libx264",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "aac",
-        "reel.mp4"
-    ]
-       
+
+    if os.path.exists("source.mp4"):
+        os.remove("source.mp4")
+        
 def publier_reel(manga, legende):
     # Génère la vidéo
     creer_video()
