@@ -87,19 +87,25 @@ def generer_texte_reel(manga):
         return f"On parle de {manga} aujourd'hui 🔥 Vous en pensez quoi ? 👇"
 
 def creer_video():
-    # Télécharge directement une vidéo libre de droits sans passer par YouTube/yt-dlp
-    url = "https://videos.pexels.com/video-files/855564/855564-hd_1080_1920_30fps.mp4"
+    print("Génération de la vidéo Reels en direct...")
     
-    print("Téléchargement du clip...")
-    response = requests.get(url, stream=True)
-    with open("source.mp4", "wb") as f:
-        for chunk in response.iter_content(chunk_size=1024*1024):
-            if chunk:
-                f.write(chunk)
-                
-    if not os.path.exists("source.mp4"):
-        raise FileNotFoundError("Téléchargement de source.mp4 échoué")
-
+    # Génère une vidéo 1080x1920 de 10 secondes avec un fond violet/sombre stylé
+    cmd_ffmpeg = [
+        "ffmpeg", "-y",
+        "-f", "lavfi", "-i", "color=c=0x1a1a2e:s=1080x1920:d=10",
+        "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+        "-vf", "drawtext=text='ONE PIECE REEL':fontcolor=white:fontsize=70:x=(w-text_w)/2:y=(h-text_h)/2",
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-shortest",
+        "reel.mp4"
+    ]
+    
+    subprocess.run(cmd_ffmpeg, check=True)
+    
+    if not os.path.exists("reel.mp4"):
+        raise FileNotFoundError("La création du Reel a échoué")
     # Adapt au format Reel (1080x1920)
     cmd_ffmpeg = [
         "ffmpeg", "-y",
