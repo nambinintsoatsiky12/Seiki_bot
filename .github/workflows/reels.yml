@@ -1,11 +1,12 @@
-name: Publication Reels
+name: Publier Reel
+
 on:
-  schedule:
-    - cron: '0 1,5,9,13,17,21 * * *'
   workflow_dispatch:
+  schedule:
+    - cron: '0 8 * * *'
 
 jobs:
-  publier_reel:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,9 +22,10 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --upgrade yt-dlp requests pillow
+          pip install --upgrade requests gTTS Pillow
 
-      - run: python scripts/publier_reel.py
+      - name: Run script
+        run: python scripts/publier_reel.py
         env:
           PAGE_ACCESS_TOKEN: ${{ secrets.PAGE_ACCESS_TOKEN }}
           PAGE_ID: ${{ secrets.PAGE_ID }}
