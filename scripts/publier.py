@@ -111,7 +111,7 @@ def generer_texte_gemini(manga, categorie):
         f"Ton chaleureux, fan de manga, accessible. Termine par une question qui invite au commentaire. "
         f"Ne mets aucun emoji (ils seront ajoutés séparément). Pas de titre, juste le texte."
     )
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={GEMINI_API_KEY}"
     r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=15)
     data = r.json()
     print("Réponse brute Gemini:", data)
