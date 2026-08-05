@@ -80,7 +80,7 @@ def generer_texte_reel(manga):
         f"Ton fan, énergique. Termine par une question courte. Ajoute 2-3 emojis pertinents. Pas de hashtags."
     )
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key={GEMINI_API_KEY}"
         r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=15)
         return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
     except Exception:
