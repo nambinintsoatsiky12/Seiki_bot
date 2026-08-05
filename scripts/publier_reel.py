@@ -123,7 +123,7 @@ def publier_reel(manga, legende):
     # Vérifie que le fichier existe avant de lire sa taille
     if not os.path.exists("reel.mp4"):
         raise FileNotFoundError("La création de reel.mp4 a échoué.")
-        taille = os.path.getsize("reel.mp4")
+    taille = os.path.getsize("reel.mp4")
     
     
     # 1. Start (Initialisation)
