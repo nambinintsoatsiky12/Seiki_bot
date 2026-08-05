@@ -13,6 +13,7 @@ GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
 FONT_URL = "https://github.com/google/fonts/raw/main/ofl/bangers/Bangers-Regular.ttf"
 FONT_PATH = "Bangers-Regular.ttf"
+DELAI_MINIMUM_MINUTES = 110  # un peu moins de 2h, pour rattraper les retards sans spammer
 
 CALENDRIER = {
     8: "citations", 10: "trivia", 12: "citations", 14: "folklore",
@@ -24,12 +25,12 @@ PREFIXES = {
     "comparatif": "⚖️📺", "portraits": "🖋️👤", "retrospectives": "⏳📚",
 }
 ANGLES = {
-    "citations": "une citation marquante du manga, avec son contexte et pourquoi elle frappe",
-    "trivia": "une anecdote peu connue sur ce manga ou son auteur",
-    "folklore": "un lien entre ce manga et le folklore/les légendes japonaises",
-    "comparatif": "une différence notable entre le manga et son adaptation anime (si elle existe)",
-    "portraits": "un fait marquant sur le mangaka qui a créé cette œuvre",
-    "retrospectives": "un regard en arrière sur l'impact ou l'originalité de ce manga",
+    "citations": "une réplique ou un moment marquant de l'anime",
+    "trivia": "une anecdote peu connue sur cet anime ou son studio",
+    "folklore": "un lien entre cet anime et le folklore/les légendes japonaises",
+    "comparatif": "une différence notable entre l'anime et son manga d'origine (si pertinent)",
+    "portraits": "un fait marquant sur le studio ou le réalisateur de cet anime",
+    "retrospectives": "un regard en arrière sur l'impact de cet anime",
 }
 ACCROCHES = ["🚨 ARRÊTE DE SCROLLER 🚨", "😱 ATTENDS VOIR ÇA 😱", "🔥 ÇA VA TE MARQUER 🔥", "👀 REGARDE ÇA DE PRÈS 👀", "⚡ ON EN PARLE ⚡", "💎 PÉPITE MÉCONNUE 💎"]
 EMOJIS_FIN = ["🔥", "😤", "💯", "🥷", "⚔️", "😭", "👑", "🎌"]
@@ -56,7 +57,7 @@ def charger_memoire():
     if os.path.exists("memoire_publications.json"):
         with open("memoire_publications.json", "r", encoding="utf-8") as f:
             return json.load(f)
-    return {"mangas_recents": []}
+    return {"mangas_recents": [], "derniere_publication": None}
 
 
 def sauvegarder_memoire(m):
@@ -64,62 +65,68 @@ def sauvegarder_memoire(m):
         json.dump(m, f, ensure_ascii=False, indent=2)
 
 
+def trop_tot_pour_publier(memoire):
+    derniere = memoire.get("derniere_publication")
+    if derniere is None:
+        return False
+    ecart = datetime.now(timezone.utc) - datetime.fromisoformat(derniere)
+    return ecart < timedelta(minutes=DELAI_MINIMUM_MINUTES)
+
+
 def piocher_manga_anilist(deja_utilises):
-    """Pioche un manga au hasard parmi un très large bassin AniList (populaires + tendances)."""
-    utiliser_tendances = random.random() < 0.25
-
-    if utiliser_tendances:
-        query = """
-        query ($page: Int) {
-          Page(page: $page, perPage: 30) {
-            media(type: MANGA, sort: TRENDING_DESC, isAdult: false) {
-              title { romaji english }
-            }
-          }
-        }
-        """
-        variables = {"page": 1}
+    """60% mangas très célèbres, 25% populaires mais moins connus, 15% tendances/nouveautés."""
+    r = random.random()
+    if r < 0.60:
+        page = random.randint(1, 5)
+    elif r < 0.85:
+        page = random.randint(6, 150)
     else:
-        page_aleatoire = random.randint(1, 150)
-        query = """
-        query ($page: Int) {
-          Page(page: $page, perPage: 30) {
-            media(type: MANGA, sort: POPULARITY_DESC, isAdult: false) {
-              title { romaji english }
-            }
-          }
-        }
-        """
-        variables = {"page": page_aleatoire}
+        page = None
 
-    r = requests.post("https://graphql.anilist.co", json={"query": query, "variables": variables})
-    resultats = r.json().get("data", {}).get("Page", {}).get("media", [])
+    if page is None:
+        query = """
+        query { Page(page: 1, perPage: 30) {
+          media(type: MANGA, sort: TRENDING_DESC, isAdult: false) { title { romaji english } }
+        }}"""
+        variables = {}
+    else:
+        query = """
+        query ($page: Int) { Page(page: $page, perPage: 30) {
+          media(type: MANGA, sort: POPULARITY_DESC, isAdult: false) { title { romaji english } }
+        }}"""
+        variables = {"page": page}
+
+    resp = requests.post("https://graphql.anilist.co", json={"query": query, "variables": variables})
+    resultats = resp.json().get("data", {}).get("Page", {}).get("media", [])
     noms = [(m["title"]["english"] or m["title"]["romaji"]) for m in resultats if m["title"]["romaji"] or m["title"]["english"]]
     noms_dispo = [n for n in noms if n not in deja_utilises]
-
     if not noms_dispo:
         return random.choice(noms) if noms else None
     return random.choice(noms_dispo)
 
 
 def generer_texte_gemini(manga, categorie):
-    angle = ANGLES.get(categorie, "un fait intéressant sur ce manga")
+    angle = ANGLES.get(categorie, "un fait intéressant sur cet anime")
     prompt = (
         f"Tu es le community manager d'une page Facebook manga/surnaturel appelée 'La piraterie'. "
-        f"Écris un post Facebook de 3 à 5 courts paragraphes sur le manga '{manga}', autour de : {angle}. "
-        f"Si tu ne connais pas bien ce manga précis, reste factuel et prudent, ne invente jamais de fausses infos. "
-        f"Ton chaleureux, fan de manga, accessible. Termine par une question qui invite au commentaire. "
+        f"Écris un post Facebook de 3 à 5 courts paragraphes sur l'anime '{manga}', en te concentrant sur "
+        f"l'adaptation animée plutôt que sur l'œuvre papier, autour de : {angle}. "
+        f"Si tu ne connais pas bien ce titre précis, reste factuel et prudent, n'invente jamais de fausses infos. "
+        f"Ton chaleureux, fan d'anime, accessible. Termine par une question qui invite au commentaire. "
         f"Ne mets aucun emoji (ils seront ajoutés séparément). Pas de titre, juste le texte."
     )
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key={GEMINI_API_KEY}"
     r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=15)
     data = r.json()
     print("Réponse brute Gemini:", data)
-
     if "candidates" not in data:
-        return f"Découvrez ou redécouvrez {manga}, une œuvre qui mérite clairement le détour dans l'univers du manga. Une pépite à suivre de près pour tout fan qui se respecte.\n\nEt vous, vous connaissez ce manga ? Dites-le en commentaire !"
-
+        return (
+            f"Découvrez ou redécouvrez {manga}, une œuvre qui mérite clairement le détour. "
+            f"Une pépite à suivre de près pour tout fan qui se respecte.\n\n"
+            f"Et vous, vous connaissez cet anime ? Dites-le en commentaire !"
+        )
     return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+
 
 def recuperer_image_anilist(titre_manga):
     query = """
@@ -205,20 +212,23 @@ def publier(categorie, manga):
 
 
 if __name__ == "__main__":
-    categorie = categorie_actuelle()
     memoire = charger_memoire()
-    deja_utilises = memoire.get("mangas_recents", [])
 
-    manga = piocher_manga_anilist(deja_utilises)
-    print(f"Catégorie : {categorie} | Manga choisi : {manga}")
-
-    if manga is None:
-        print("Aucun manga récupéré depuis AniList, publication annulée.")
+    if trop_tot_pour_publier(memoire):
+        print("Moins de 110 minutes depuis la dernière publication, on attend le prochain passage.")
     else:
-        resultat = publier(categorie, manga)
-        print("Résultat:", resultat)
+        categorie = categorie_actuelle()
+        deja_utilises = memoire.get("mangas_recents", [])
+        manga = piocher_manga_anilist(deja_utilises)
+        print(f"Catégorie : {categorie} | Manga choisi : {manga}")
 
-        if "error" not in resultat:
-            deja_utilises.append(manga)
-            memoire["mangas_recents"] = deja_utilises[-150:]
-            sauvegarder_memoire(memoire)
+        if manga is None:
+            print("Aucun manga récupéré depuis AniList, publication annulée.")
+        else:
+            resultat = publier(categorie, manga)
+            print("Résultat:", resultat)
+            if "error" not in resultat:
+                deja_utilises.append(manga)
+                memoire["mangas_recents"] = deja_utilises[-150:]
+                memoire["derniere_publication"] = datetime.now(timezone.utc).isoformat()
+                sauvegarder_memoire(memoire)
