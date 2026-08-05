@@ -101,15 +101,13 @@ def creer_video():
     cmd_ffmpeg = [
         "ffmpeg", "-y",
         "-i", "source.mp4",
-        "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
         "-t", "30",
         "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
         "-c:v", "libx264",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac",
-        "-shortest",
         "reel.mp4"
-    ]
+]
     subprocess.run(cmd_ffmpeg, check=True)
 
     if os.path.exists("source.mp4"):
