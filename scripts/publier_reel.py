@@ -91,13 +91,12 @@ def creer_video():
     cmd_yt = [
         "yt-dlp",
         "ytsearch1:One Piece fight short",
+        "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "--max-filesize", "50M",
-        "-f", "mp4",
+        "-f", "b/best",
         "--no-playlist",
         "-o", "source.mp4"
     ]
-    subprocess.run(cmd_yt, check=True)
-
     # 2. Recadrage FFmpeg avec génération d'audio si absent
     cmd_ffmpeg = [
         "ffmpeg", "-y",
