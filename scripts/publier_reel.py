@@ -1,196 +1,96 @@
-import json
 import os
 import random
 import subprocess
-import time
-from datetime import date
-from io import BytesIO
-import requests
+from gTTS import gTTS
 from PIL import Image, ImageDraw, ImageFont
 
-PAGE_ACCESS_TOKEN = os.environ["PAGE_ACCESS_TOKEN"]
-PAGE_ID = os.environ["PAGE_ID"]
-GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
-
-FONT_URL = "https://github.com/google/fonts/raw/main/ofl/bangers/Bangers-Regular.ttf"
-FONT_PATH = "Bangers-Regular.ttf"
-
-
-def manga_de_la_semaine():
-    with open("contenu/rotation_reels.json", "r", encoding="utf-8") as f:
-        liste = json.load(f)
-    semaine = date.today().isocalendar()[1]
-    return liste[semaine % len(liste)]
-
-
-def recuperer_image_anilist(titre_manga):
-    query = """
-    query ($search: String) {
-      Media(search: $search, type: MANGA, isAdult: false) {
-        isAdult
-        coverImage { extraLarge }
-      }
+# --- BASE DE DONNÉES DES HISTOIRES (Format 50 secondes) ---
+MANGAS = [
+    {
+        "titre": "ONE PIECE",
+        "histoire": (
+            "Gol D. Roger, le Roi des Pirates, a exécuté le plus grand coup de l'histoire en léguant son trésor ultime, "
+            "le One Piece, à quiconque le trouvera. Vingt ans plus tard, Monkey D. Luffy, un jeune homme au corps d'élastique "
+            "ayant mangé le fruit du démon, prend la mer à bord d'une barque. Son objectif est simple mais monumental : "
+            "rassembler un équipage légendaire, traverser la ligne de Grand Line et devenir le nouveau Roi des Pirates !"
+        ),
+        "couleur_fond": "#0f2027"
+    },
+    {
+        "titre": "SOLO LEVELING",
+        "histoire": (
+            "Dans un monde menacé par des monstres issus de portes interdimensionnelles, Sung Jinwoo est connu comme le chasseur "
+            "le plus faible de toute l'humanité. Incapable de financer les soins de sa mère, il continue de risquer sa vie dans des donjons. "
+            "Mais lors d'une mission de routine qui tourne au massacre dans un donjon double, Jinwoo frôle la mort et débloque "
+            "un système d'interface secret qui fait de lui le seul joueur capable de monter de niveau sans aucune limite."
+        ),
+        "couleur_fond": "#141e30"
+    },
+    {
+        "titre": "NARUTO",
+        "histoire": (
+            "Orphelin rejeté et craint par tout le village de Konoha à cause du démon renard à neuf queues scellé en lui, "
+            "Naruto Uzumaki a grandi dans la solitude absolue. Mais au lieu de sombrer dans la haine, il s'est fixé le défi "
+            "le plus ambitieux de sa vie : devenir le Hokage, le leader ultime de son village, afin de forcer tout le monde "
+            "à reconnaître enfin sa véritable valeur."
+        ),
+        "couleur_fond": "#45a247"
     }
-    """
-    r = requests.post("https://graphql.anilist.co", json={"query": query, "variables": {"search": titre_manga}})
-    media = r.json().get("data", {}).get("Media")
-    if media is None or media.get("isAdult"):
-        return None
-    return media["coverImage"]["extraLarge"]
-
-
-def telecharger_police():
-    if not os.path.exists(FONT_PATH):
-        r = requests.get(FONT_URL)
-        with open(FONT_PATH, "wb") as f:
-            f.write(r.content)
-
-
-def creer_image_verticale(image_url, manga):
-    telecharger_police()
-    r = requests.get(image_url)
-    image = Image.open(BytesIO(r.content)).convert("RGB")
-
-    cible_w, cible_h = 1080, 1920
-    ratio = max(cible_w / image.width, cible_h / image.height)
-    nouvelle_taille = (int(image.width * ratio), int(image.height * ratio))
-    image = image.resize(nouvelle_taille)
-    gauche = (image.width - cible_w) / 2
-    haut = (image.height - cible_h) / 2
-    image = image.crop((gauche, haut, gauche + cible_w, haut + cible_h))
-
-    dessin = ImageDraw.Draw(image)
-    police = ImageFont.truetype(FONT_PATH, 90)
-    texte = manga.upper()
-    boite = dessin.textbbox((0, 0), texte, font=police)
-    x = (cible_w - (boite[2] - boite[0])) / 2
-    y = cible_h - 300
-    for dx in range(-4, 5):
-        for dy in range(-4, 5):
-            dessin.text((x + dx, y + dy), texte, font=police, fill="black")
-    dessin.text((x, y), texte, font=police, fill="white")
-
-    image.save("frame.jpg", quality=95)
-
-
-def generer_texte_reel(manga):
-    prompt = (
-        f"Tu es le community manager d'une page Facebook manga/surnaturel. "
-        f"Écris une légende COURTE et percutante (2-3 phrases max) pour un Reel vidéo mettant en avant le manga '{manga}'. "
-        f"Ton fan, énergique. Termine par une question courte. Ajoute 2-3 emojis pertinents. Pas de hashtags."
-    )
-    try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key={GEMINI_API_KEY}"
-        r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=15)
-        return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-    except Exception:
-        return f"On parle de {manga} aujourd'hui 🔥 Vous en pensez quoi ? 👇"
+]
 
 def creer_video():
-    print("Téléchargement d'un vrai clip vidéo...")
-    
-    # Lien direct vers une vraie vidéo MP4 HD (dynamique)
-    url = "https://cdn.pixabay.com/video/2020/05/25/40149-425126838_tiny.mp4"
-    
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    req = requests.get(url, headers=headers, timeout=15)
-    
-    with open("source.mp4", "wb") as f:
-        f.write(req.content)
+    manga = random.choice(MANGAS)
+    print(f"Création de l'histoire pour : {manga['titre']}")
 
-    print("Mise au format vertical 9:16 + Ajout d'une bande son...")
+    # 1. Génération de l'audio long (Voix IA en français)
+    audio_file = "voix.mp3"
+    tts = gTTS(text=manga["histoire"], lang='fr', slow=False)
+    tts.save(audio_file)
+
+    # 2. Obtenir la durée exacte de l'audio avec ffprobe
+    cmd_duration = [
+        "ffprobe", "-v", "error", "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1", audio_file
+    ]
+    duration = float(subprocess.check_output(cmd_duration).decode('utf-8').strip())
+    print(f"Durée de l'histoire : {duration:.1f} secondes")
+
+    # 3. Génération des images du diaporama
+    image_files = []
+    textes = [manga['titre'], "L'HISTOIRE", "LE DESTIN", "ABONNE-TOI !"]
     
-    # FFmpeg recadre en Reel (1080x1920) et injecte du son propre
+    for i, txt in enumerate(textes):
+        img = Image.new('RGB', (1080, 1920), color=manga['couleur_fond'])
+        draw = ImageDraw.Draw(img)
+        draw.text((540, 960), txt, fill="white", anchor="mm")
+        
+        filename = f"frame_{i}.png"
+        img.save(filename)
+        image_files.append(filename)
+
+    # Calcul du temps par image pour couvrir toute la durée de la voix
+    time_per_img = duration / len(textes)
+
+    # 4. Assemblage FFmpeg (Vidéo 9:16 + Voix IA synchronisée)
     cmd_ffmpeg = [
         "ffmpeg", "-y",
-        "-i", "source.mp4",
-        "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
-        "-t", "15",
-        "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
+        "-framerate", f"1/{time_per_img}",
+        "-i", "frame_%d.png",
+        "-i", audio_file,
         "-c:v", "libx264",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac",
         "-shortest",
         "reel.mp4"
     ]
+    
+    print("Assemblage du Reel en cours...")
     subprocess.run(cmd_ffmpeg, check=True)
 
-    if os.path.exists("source.mp4"):
-        os.remove("source.mp4")
-        
-def publier_reel(manga, legende):
-    # Génère la vidéo
-    creer_video()
+    # Nettoyage
+    os.remove(audio_file)
+    for f in image_files:
+        os.remove(f)
 
-    # Vérifie que le fichier existe avant de lire sa taille
-    if not os.path.exists("reel.mp4"):
-        raise FileNotFoundError("La création de reel.mp4 a échoué.")
-    taille = os.path.getsize("reel.mp4")
-    
-    
-    # 1. Start (Initialisation)
-    r = requests.post(
-        f"https://graph.facebook.com/v21.0/{PAGE_ID}/video_reels",
-        data={"upload_phase": "start", "access_token": PAGE_ACCESS_TOKEN}
-    )
-    depart = r.json()
-    video_id = depart.get("video_id")
-    upload_url = depart.get("upload_url")
-    
-    if not video_id or not upload_url:
-        print("Erreur initialisation Facebook:", depart)
-        return depart
-
-    # 2. Upload de la vidéo
-    taille = os.path.getsize("reel.mp4")
-    
-    with open("reel.mp4", "rb") as f:
-        contenu = f.read()
-        
-    r2 = requests.post(
-        upload_url,
-        headers={
-            "Authorization": f"OAuth {PAGE_ACCESS_TOKEN}",
-            "offset": "0",
-            "file_size": str(taille)
-        },
-        data=contenu
-    )
-    print("Résultat upload:", r2.json())
-    # Pause de 15 secondes pour laisser le temps à Meta de traiter le fichier
-    print("Attente du traitement vidéo par Meta...")
-    time.sleep(15)
-    
-# 3. Finish (Publication)
-    r3 = requests.post(
-        f"https://graph.facebook.com/v21.0/{PAGE_ID}/video_reels",
-        params={"access_token": PAGE_ACCESS_TOKEN},
-        data={
-            "upload_phase": "finish",
-            "video_id": video_id,
-            "video_state": "PUBLISHED",
-            "published": "true",
-            "description": legende
-        }
-    )
-    
-    reponse = r3.json()
-    print("REPONSE DE META :", reponse) # <-- Regarde cette ligne dans les logs !
-    
-    if "error" in reponse:
-        raise Exception(f"Meta a refusé le Reel : {reponse['error']}")
-        
-    return reponse
 if __name__ == "__main__":
-    manga = manga_de_la_semaine()
-    print("Manga de la semaine :", manga)
-
-    image_url = recuperer_image_anilist(manga)
-    if image_url is None:
-        print("Image introuvable, Reel annulé.")
-    else:
-        creer_image_verticale(image_url, manga)
-        creer_video()
-        legende = generer_texte_reel(manga)
-        resultat = publier_reel(manga, legende)
-        print("Résultat final:", resultat)
+    creer_video()
