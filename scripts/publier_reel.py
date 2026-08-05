@@ -88,8 +88,6 @@ def generer_texte_reel(manga):
 
 def creer_video():
     print("Génération de la vidéo Reels en direct...")
-    
-    # Génère une vidéo 1080x1920 de 10 secondes avec un fond violet/sombre stylé
     cmd_ffmpeg = [
         "ffmpeg", "-y",
         "-f", "lavfi", "-i", "color=c=0x1a1a2e:s=1080x1920:d=10",
@@ -101,7 +99,6 @@ def creer_video():
         "-shortest",
         "reel.mp4"
     ]
-    
     subprocess.run(cmd_ffmpeg, check=True)
     
     if not os.path.exists("reel.mp4"):
