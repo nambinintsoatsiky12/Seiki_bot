@@ -114,12 +114,7 @@ def creer_video():
         "-c:a", "aac",
         "reel.mp4"
     ]
-    print("Mise au format vertical...")
-    subprocess.run(cmd_ffmpeg, check=True)
-
-    if os.path.exists("source.mp4"):
-        os.remove("source.mp4")
-        
+       
 def publier_reel(manga, legende):
     # Génère la vidéo
     creer_video()
