@@ -27,17 +27,11 @@ ANGLES = {
     "citations": "une citation marquante du manga, avec son contexte et pourquoi elle frappe",
     "trivia": "une anecdote peu connue sur ce manga ou son auteur",
     "folklore": "un lien entre ce manga et le folklore/les légendes japonaises",
-    "comparatif": "une différence notable entre le manga et son adaptation anime",
+    "comparatif": "une différence notable entre le manga et son adaptation anime (si elle existe)",
     "portraits": "un fait marquant sur le mangaka qui a créé cette œuvre",
-    "retrospectives": "un regard en arrière sur l'impact de ce manga dans le temps",
+    "retrospectives": "un regard en arrière sur l'impact ou l'originalité de ce manga",
 }
-ACCROCHES = [
-    "🚨 ARRÊTE DE SCROLLER 🚨",
-    "😱 ATTENDS VOIR ÇA 😱",
-    "🔥 ÇA VA TE MARQUER 🔥",
-    "👀 REGARDE ÇA DE PRÈS 👀",
-    "⚡ ON EN PARLE ⚡",
-]
+ACCROCHES = ["🚨 ARRÊTE DE SCROLLER 🚨", "😱 ATTENDS VOIR ÇA 😱", "🔥 ÇA VA TE MARQUER 🔥", "👀 REGARDE ÇA DE PRÈS 👀", "⚡ ON EN PARLE ⚡", "💎 PÉPITE MÉCONNUE 💎"]
 EMOJIS_FIN = ["🔥", "😤", "💯", "🥷", "⚔️", "😭", "👑", "🎌"]
 EMOJIS_PARAGRAPHE = ["💥", "😨", "🤯", "😮‍💨", "👊", "🩸", "⚡", "🖤"]
 
@@ -46,12 +40,10 @@ ITALIQUE = "𝘢𝘣𝘤𝘥𝘦𝘧𝘨𝘩𝘪𝘫𝘬𝘭𝘮𝘯𝘰𝘱𝘲
 GRAS = "𝗮𝗯𝗰𝗱𝗲𝗳𝗴𝗵𝗶𝗷𝗸𝗹𝗺𝗻𝗼𝗽𝗾𝗿𝘀𝘁𝘂𝘃𝘄𝘅𝘆𝘇𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭𝟬𝟭𝟮𝟯𝟰𝟱𝟲𝟳𝟴𝟵"
 ACCROCHE_STYLE = "𝙖𝙗𝙘𝙙𝙚𝙛𝙜𝙝𝙞𝙟𝙠𝙡𝙢𝙣𝙤𝙥𝙦𝙧𝙨𝙩𝙪𝙫𝙬𝙭𝙮𝙯𝘼𝘽𝘾𝘿𝙀𝙁𝙂𝙃𝙄𝙅𝙆𝙇𝙈𝙉𝙊𝙋𝙌𝙍𝙎𝙏𝙐𝙑𝙒𝙓𝙔𝙕0123456789"
 TITRE_STYLE = "𝖆𝖇𝖈𝖉𝖊𝖋𝖌𝖍𝖎𝖏𝖐𝖑𝖒𝖓𝖔𝖕𝖖𝖗𝖘𝖙𝖚𝖛𝖜𝖝𝖞𝖟𝕬𝕭𝕮𝕯𝕰𝕱𝕲𝕳𝕴𝕵𝕶𝕷𝕸𝕹𝕺𝕻𝕼𝕽𝕾𝕿𝖀𝖁𝖂𝖃𝖄𝖅0123456789"
-
 TABLE_ITALIQUE = str.maketrans(NORMAL, ITALIQUE)
 TABLE_GRAS = str.maketrans(NORMAL, GRAS)
 TABLE_ACCROCHE = str.maketrans(NORMAL, ACCROCHE_STYLE)
 TABLE_TITRE = str.maketrans(NORMAL, TITRE_STYLE)
-
 MOTS_A_IGNORER = {"cette","avec","pour","dans","leur","leurs","elle","aussi","mais","plus","être","avoir","tout","tous","toute","toutes","comme","entre","sans","encore","depuis","avant","après","parce","alors"}
 
 
@@ -60,16 +52,11 @@ def categorie_actuelle():
     return CALENDRIER[min(CALENDRIER.keys(), key=lambda x: abs(x - h))]
 
 
-def charger_contenu(categorie):
-    with open(f"contenu/{categorie}.json", "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
 def charger_memoire():
     if os.path.exists("memoire_publications.json"):
         with open("memoire_publications.json", "r", encoding="utf-8") as f:
             return json.load(f)
-    return {}
+    return {"mangas_recents": []}
 
 
 def sauvegarder_memoire(m):
@@ -77,30 +64,56 @@ def sauvegarder_memoire(m):
         json.dump(m, f, ensure_ascii=False, indent=2)
 
 
-def choisir_entree(entrees, memoire, categorie):
-    utilisees = memoire.get(categorie, [])
-    dispo = [e for e in entrees if e["id"] not in utilisees]
-    if not dispo:
-        utilisees = []
-        dispo = entrees
-    memoire[categorie] = utilisees
-    return random.choice(dispo)
+def piocher_manga_anilist(deja_utilises):
+    """Pioche un manga au hasard parmi un très large bassin AniList (populaires + tendances)."""
+    utiliser_tendances = random.random() < 0.25
+
+    if utiliser_tendances:
+        query = """
+        query ($page: Int) {
+          Page(page: $page, perPage: 30) {
+            media(type: MANGA, sort: TRENDING_DESC, isAdult: false) {
+              title { romaji english }
+            }
+          }
+        }
+        """
+        variables = {"page": 1}
+    else:
+        page_aleatoire = random.randint(1, 150)
+        query = """
+        query ($page: Int) {
+          Page(page: $page, perPage: 30) {
+            media(type: MANGA, sort: POPULARITY_DESC, isAdult: false) {
+              title { romaji english }
+            }
+          }
+        }
+        """
+        variables = {"page": page_aleatoire}
+
+    r = requests.post("https://graphql.anilist.co", json={"query": query, "variables": variables})
+    resultats = r.json().get("data", {}).get("Page", {}).get("media", [])
+    noms = [(m["title"]["english"] or m["title"]["romaji"]) for m in resultats if m["title"]["romaji"] or m["title"]["english"]]
+    noms_dispo = [n for n in noms if n not in deja_utilises]
+
+    if not noms_dispo:
+        return random.choice(noms) if noms else None
+    return random.choice(noms_dispo)
 
 
-def generer_texte_gemini(manga, categorie, texte_secours):
+def generer_texte_gemini(manga, categorie):
     angle = ANGLES.get(categorie, "un fait intéressant sur ce manga")
     prompt = (
         f"Tu es le community manager d'une page Facebook manga/surnaturel appelée 'La piraterie'. "
         f"Écris un post Facebook de 3 à 5 courts paragraphes sur le manga '{manga}', autour de : {angle}. "
+        f"Si tu ne connais pas bien ce manga précis, reste factuel et prudent, ne invente jamais de fausses infos. "
         f"Ton chaleureux, fan de manga, accessible. Termine par une question qui invite au commentaire. "
         f"Ne mets aucun emoji (ils seront ajoutés séparément). Pas de titre, juste le texte."
     )
-    try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
-        r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=15)
-        return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-    except Exception:
-        return texte_secours
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+    r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=15)
+    return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
 
 
 def recuperer_image_anilist(titre_manga):
@@ -165,18 +178,18 @@ def styliser_texte(texte):
     return "\n\n".join(styliser_paragraphe(p) for p in texte.split("\n\n") if p.strip())
 
 
-def publier(categorie, entree):
-    image_url = recuperer_image_anilist(entree["manga"])
+def publier(categorie, manga):
+    image_url = recuperer_image_anilist(manga)
     if image_url is None:
-        print(f"Pas d'image valide pour {entree['manga']}, annulé.")
+        print(f"Pas d'image valide pour {manga}, annulé.")
         return {"error": "image non trouvee"}
 
-    texte_brut = generer_texte_gemini(entree["manga"], categorie, entree["texte"])
+    texte_brut = generer_texte_gemini(manga, categorie)
     corps = styliser_texte(texte_brut)
-    image_stylee = creer_image_stylee(image_url, entree["manga"])
-    titre = entree["manga"].upper().translate(TABLE_TITRE)
+    image_stylee = creer_image_stylee(image_url, manga)
+    titre = manga.upper().translate(TABLE_TITRE)
     accroche = random.choice(ACCROCHES).translate(TABLE_ACCROCHE)
-    legende = f"{accroche}\n\n{PREFIXES.get(categorie,'✨')} {titre}\n\n{corps}\n\n{random.choice(EMOJIS_FIN)} #{entree['manga'].replace(' ','')} #manga #anime"
+    legende = f"{accroche}\n\n{PREFIXES.get(categorie,'✨')} {titre}\n\n{corps}\n\n{random.choice(EMOJIS_FIN)} #{manga.replace(' ','')} #manga #anime"
 
     r = requests.post(
         f"https://graph.facebook.com/v21.0/{PAGE_ID}/photos",
@@ -188,11 +201,19 @@ def publier(categorie, entree):
 
 if __name__ == "__main__":
     categorie = categorie_actuelle()
-    contenu = charger_contenu(categorie)
     memoire = charger_memoire()
-    entree = choisir_entree(contenu, memoire, categorie)
-    resultat = publier(categorie, entree)
-    print("Résultat:", resultat)
-    if "error" not in resultat:
-        memoire.setdefault(categorie, []).append(entree["id"])
-        sauvegarder_memoire(memoire)
+    deja_utilises = memoire.get("mangas_recents", [])
+
+    manga = piocher_manga_anilist(deja_utilises)
+    print(f"Catégorie : {categorie} | Manga choisi : {manga}")
+
+    if manga is None:
+        print("Aucun manga récupéré depuis AniList, publication annulée.")
+    else:
+        resultat = publier(categorie, manga)
+        print("Résultat:", resultat)
+
+        if "error" not in resultat:
+            deja_utilises.append(manga)
+            memoire["mangas_recents"] = deja_utilises[-150:]
+            sauvegarder_memoire(memoire)
