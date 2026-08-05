@@ -87,17 +87,24 @@ def generer_texte_reel(manga):
         return f"On parle de {manga} aujourd'hui 🔥 Vous en pensez quoi ? 👇"
 
 def creer_video():
-    # 1. Télécharge la vidéo avec yt-dlp
+    # 1. Téléchargement forcé au format MP4 avec gestion des formats
     cmd_yt = [
         "yt-dlp",
         "ytsearch1:One Piece fight short",
-        "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "--max-filesize", "50M",
-        "-f", "b/best",
+        "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "--recode-video", "mp4",
         "--no-playlist",
         "-o", "source.mp4"
     ]
-    # 2. Recadrage FFmpeg avec génération d'audio si absent
+    print("Téléchargement du clip...")
+    subprocess.run(cmd_yt, check=True)
+
+    # Vérification que le téléchargement a fonctionné
+    if not os.path.exists("source.mp4"):
+        raise FileNotFoundError("yt-dlp n'a pas pu créer source.mp4")
+
+    # 2. Recadrage FFmpeg 9:16
     cmd_ffmpeg = [
         "ffmpeg", "-y",
         "-i", "source.mp4",
@@ -107,9 +114,11 @@ def creer_video():
         "-pix_fmt", "yuv420p",
         "-c:a", "aac",
         "reel.mp4"
-]
+    ]
+    print("Découpage FFmpeg...")
     subprocess.run(cmd_ffmpeg, check=True)
 
+    # Nettoyage
     if os.path.exists("source.mp4"):
         os.remove("source.mp4")
         
