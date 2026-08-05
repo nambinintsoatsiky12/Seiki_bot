@@ -91,7 +91,7 @@ def creer_video():
     cmd_yt = [
         "yt-dlp",
         "ytsearch1:One Piece fight short",
-        "--extractor-args", "youtube:player_client=android,web",
+        "--extractor-args", "youtube:player_client=ios,mweb,tvhtml5",
         "--max-filesize", "50M",
         "-f", "b/best",
         "--no-playlist",
