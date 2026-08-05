@@ -87,24 +87,20 @@ def generer_texte_reel(manga):
         return f"On parle de {manga} aujourd'hui 🔥 Vous en pensez quoi ? 👇"
 
 def creer_video():
-    # 1. Téléchargement forcé au format MP4 avec gestion des formats
-    cmd_yt = [
-        "yt-dlp",
-        "ytsearch1:One Piece fight short",
-        "--extractor-args", "youtube:player_client=ios,mweb,tvhtml5",
-        "--max-filesize", "50M",
-        "-f", "b/best",
-        "--no-playlist",
-        "-o", "source.mp4"
-    ]
+    # Télécharge directement une vidéo libre de droits sans passer par YouTube/yt-dlp
+    url = "https://videos.pexels.com/video-files/855564/855564-hd_1080_1920_30fps.mp4"
+    
     print("Téléchargement du clip...")
-    subprocess.run(cmd_yt, check=True)
-
-    # Vérification que le téléchargement a fonctionné
+    response = requests.get(url, stream=True)
+    with open("source.mp4", "wb") as f:
+        for chunk in response.iter_content(chunk_size=1024*1024):
+            if chunk:
+                f.write(chunk)
+                
     if not os.path.exists("source.mp4"):
-        raise FileNotFoundError("yt-dlp n'a pas pu créer source.mp4")
+        raise FileNotFoundError("Téléchargement de source.mp4 échoué")
 
-    # 2. Recadrage FFmpeg 9:16
+    # Adapt au format Reel (1080x1920)
     cmd_ffmpeg = [
         "ffmpeg", "-y",
         "-i", "source.mp4",
@@ -115,10 +111,9 @@ def creer_video():
         "-c:a", "aac",
         "reel.mp4"
     ]
-    print("Découpage FFmpeg...")
+    print("Mise au format vertical...")
     subprocess.run(cmd_ffmpeg, check=True)
 
-    # Nettoyage
     if os.path.exists("source.mp4"):
         os.remove("source.mp4")
         
