@@ -214,7 +214,7 @@ def publier(categorie, manga):
 if __name__ == "__main__":
     memoire = charger_memoire()
 
-    if trop_tot_pour_publier(memoire):
+    if False:  # trop_tot_pour_publier(memoire)  ← désactivé temporairement pour la capture, à remettre après !
         print("Moins de 110 minutes depuis la dernière publication, on attend le prochain passage.")
     else:
         categorie = categorie_actuelle()
