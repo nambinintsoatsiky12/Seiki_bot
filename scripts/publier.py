@@ -13,7 +13,18 @@ GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
 FONT_URL = "https://github.com/google/fonts/raw/main/ofl/bangers/Bangers-Regular.ttf"
 FONT_PATH = "Bangers-Regular.ttf"
-DELAI_MINIMUM_MINUTES = 110  # un peu moins de 2h, pour rattraper les retards sans spammer
+DELAI_MINIMUM_MINUTES = 110
+LARGEUR_MINIMUM_IMAGE = 600
+
+MANGAS_CELEBRES = [
+    "One Piece", "Naruto", "Attack on Titan", "Demon Slayer", "Jujutsu Kaisen",
+    "Death Note", "My Hero Academia", "Fullmetal Alchemist", "Dragon Ball",
+    "Bleach", "Hunter x Hunter", "Tokyo Ghoul", "Chainsaw Man", "Spy x Family",
+    "One Punch Man", "Black Clover", "Fairy Tail", "Sword Art Online",
+    "Tokyo Revengers", "Vinland Saga", "Jojo's Bizarre Adventure",
+    "Mob Psycho 100", "The Promised Neverland", "Haikyuu", "Blue Lock",
+    "Solo Leveling", "Berserk", "Vagabond", "Slam Dunk", "Rurouni Kenshin",
+]
 
 CALENDRIER = {
     8: "citations", 10: "trivia", 12: "citations", 14: "folklore",
@@ -25,12 +36,31 @@ PREFIXES = {
     "comparatif": "⚖️📺", "portraits": "🖋️👤", "retrospectives": "⏳📚",
 }
 ANGLES = {
-    "citations": "une réplique ou un moment marquant de l'anime",
-    "trivia": "une anecdote peu connue sur cet anime ou son studio",
-    "folklore": "un lien entre cet anime et le folklore/les légendes japonaises",
-    "comparatif": "une différence notable entre l'anime et son manga d'origine (si pertinent)",
-    "portraits": "un fait marquant sur le studio ou le réalisateur de cet anime",
-    "retrospectives": "un regard en arrière sur l'impact de cet anime",
+    "citations": (
+        "Commence OBLIGATOIREMENT par une réplique culte de l'anime entre guillemets français, "
+        "sur sa propre ligne, suivie d'un saut de ligne. Ensuite explique le contexte et pourquoi "
+        "cette phrase marque les fans."
+    ),
+    "trivia": (
+        "Commence OBLIGATOIREMENT par 'Le saviez-vous ?' suivi d'une anecdote peu connue "
+        "sur cet anime, son studio, ou sa production."
+    ),
+    "folklore": (
+        "Explique un lien concret entre cet anime et une légende, un yōkai, ou une croyance "
+        "du folklore japonais traditionnel."
+    ),
+    "comparatif": (
+        "Compare une scène ou un choix précis entre l'anime et son manga d'origine "
+        "(si un manga existe), en expliquant ce qui change et pourquoi."
+    ),
+    "portraits": (
+        "Commence OBLIGATOIREMENT par le nom du studio d'animation ou du réalisateur, "
+        "puis raconte un fait marquant sur leur travail sur cet anime."
+    ),
+    "retrospectives": (
+        "Commence OBLIGATOIREMENT par une phrase du type 'Retour sur...' et regarde en arrière "
+        "sur l'impact ou l'héritage de cet anime dans le temps."
+    ),
 }
 ACCROCHES = ["🚨 ARRÊTE DE SCROLLER 🚨", "😱 ATTENDS VOIR ÇA 😱", "🔥 ÇA VA TE MARQUER 🔥", "👀 REGARDE ÇA DE PRÈS 👀", "⚡ ON EN PARLE ⚡", "💎 PÉPITE MÉCONNUE 💎"]
 EMOJIS_FIN = ["🔥", "😤", "💯", "🥷", "⚔️", "😭", "👑", "🎌"]
@@ -73,53 +103,48 @@ def trop_tot_pour_publier(memoire):
     return ecart < timedelta(minutes=DELAI_MINIMUM_MINUTES)
 
 
-def piocher_manga_anilist(deja_utilises):
-    """60% mangas très célèbres, 25% populaires mais moins connus, 15% tendances/nouveautés."""
-    r = random.random()
-    if r < 0.60:
-        page = random.randint(1, 5)
-    elif r < 0.85:
-        page = random.randint(6, 150)
-    else:
-        page = None
+def piocher_manga(deja_utilises):
+    if random.random() < 0.60:
+        dispo = [m for m in MANGAS_CELEBRES if m not in deja_utilises]
+        return random.choice(dispo) if dispo else random.choice(MANGAS_CELEBRES)
 
-    if page is None:
+    if random.random() < 0.7:
+        query = """
+        query ($page: Int) { Page(page: $page, perPage: 30) {
+          media(type: MANGA, sort: POPULARITY_DESC, isAdult: false) { title { romaji english } }
+        }}"""
+        variables = {"page": random.randint(6, 100)}
+    else:
         query = """
         query { Page(page: 1, perPage: 30) {
           media(type: MANGA, sort: TRENDING_DESC, isAdult: false) { title { romaji english } }
         }}"""
         variables = {}
-    else:
-        query = """
-        query ($page: Int) { Page(page: $page, perPage: 30) {
-          media(type: MANGA, sort: POPULARITY_DESC, isAdult: false) { title { romaji english } }
-        }}"""
-        variables = {"page": page}
 
     resp = requests.post("https://graphql.anilist.co", json={"query": query, "variables": variables})
     resultats = resp.json().get("data", {}).get("Page", {}).get("media", [])
     noms = [(m["title"]["english"] or m["title"]["romaji"]) for m in resultats if m["title"]["romaji"] or m["title"]["english"]]
     noms_dispo = [n for n in noms if n not in deja_utilises]
     if not noms_dispo:
-        return random.choice(noms) if noms else None
+        return random.choice(MANGAS_CELEBRES)
     return random.choice(noms_dispo)
 
 
 def generer_texte_gemini(manga, categorie):
-    angle = ANGLES.get(categorie, "un fait intéressant sur cet anime")
+    consigne = ANGLES.get(categorie, "un fait intéressant sur cet anime")
     prompt = (
         f"Tu es le community manager d'une page Facebook manga/surnaturel appelée 'La piraterie'. "
-        f"Écris un post Facebook de 3 à 5 courts paragraphes sur l'anime '{manga}', en te concentrant sur "
-        f"l'adaptation animée plutôt que sur l'œuvre papier, autour de : {angle}. "
+        f"Écris un post Facebook de 3 à 5 courts paragraphes sur l'anime '{manga}'. "
+        f"CONSIGNE DE FORMAT STRICTE À RESPECTER : {consigne}\n"
         f"Si tu ne connais pas bien ce titre précis, reste factuel et prudent, n'invente jamais de fausses infos. "
         f"Ton chaleureux, fan d'anime, accessible. Termine par une question qui invite au commentaire. "
         f"Ne mets aucun emoji (ils seront ajoutés séparément). Pas de titre, juste le texte."
     )
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={GEMINI_API_KEY}"
     r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=15)
     data = r.json()
-    print("Réponse brute Gemini:", data)
     if "candidates" not in data:
+        print("Réponse brute Gemini (échec):", data)
         return (
             f"Découvrez ou redécouvrez {manga}, une œuvre qui mérite clairement le détour. "
             f"Une pépite à suivre de près pour tout fan qui se respecte.\n\n"
@@ -155,6 +180,10 @@ def creer_image_stylee(image_url, titre_manga):
     telecharger_police()
     r = requests.get(image_url)
     image = Image.open(BytesIO(r.content)).convert("RGB")
+
+    if image.width < LARGEUR_MINIMUM_IMAGE:
+        return None
+
     dessin = ImageDraw.Draw(image)
     taille = int(image.width / 10)
     police = ImageFont.truetype(FONT_PATH, taille)
@@ -167,7 +196,7 @@ def creer_image_stylee(image_url, titre_manga):
             dessin.text((x + dx, y + dy), texte, font=police, fill="black")
     dessin.text((x, y), texte, font=police, fill="white")
     sortie = BytesIO()
-    image.save(sortie, format="JPEG")
+    image.save(sortie, format="JPEG", quality=95)
     sortie.seek(0)
     return sortie
 
@@ -193,12 +222,14 @@ def styliser_texte(texte):
 def publier(categorie, manga):
     image_url = recuperer_image_anilist(manga)
     if image_url is None:
-        print(f"Pas d'image valide pour {manga}, annulé.")
         return {"error": "image non trouvee"}
+
+    image_stylee = creer_image_stylee(image_url, manga)
+    if image_stylee is None:
+        return {"error": "image trop basse resolution"}
 
     texte_brut = generer_texte_gemini(manga, categorie)
     corps = styliser_texte(texte_brut)
-    image_stylee = creer_image_stylee(image_url, manga)
     titre = manga.upper().translate(TABLE_TITRE)
     accroche = random.choice(ACCROCHES).translate(TABLE_ACCROCHE)
     legende = f"{accroche}\n\n{PREFIXES.get(categorie,'✨')} {titre}\n\n{corps}\n\n{random.choice(EMOJIS_FIN)} #{manga.replace(' ','')} #manga #anime"
@@ -214,21 +245,29 @@ def publier(categorie, manga):
 if __name__ == "__main__":
     memoire = charger_memoire()
 
-    if False:  # trop_tot_pour_publier(memoire)  ← désactivé temporairement pour la capture, à remettre après !
+    if trop_tot_pour_publier(memoire):
         print("Moins de 110 minutes depuis la dernière publication, on attend le prochain passage.")
     else:
         categorie = categorie_actuelle()
         deja_utilises = memoire.get("mangas_recents", [])
-        manga = piocher_manga_anilist(deja_utilises)
-        print(f"Catégorie : {categorie} | Manga choisi : {manga}")
+        manga = None
+        resultat = {"error": "aucune tentative"}
 
-        if manga is None:
-            print("Aucun manga récupéré depuis AniList, publication annulée.")
-        else:
-            resultat = publier(categorie, manga)
-            print("Résultat:", resultat)
+        for _ in range(4):
+            candidat = piocher_manga(deja_utilises)
+            if candidat is None:
+                continue
+            resultat = publier(categorie, candidat)
             if "error" not in resultat:
-                deja_utilises.append(manga)
-                memoire["mangas_recents"] = deja_utilises[-150:]
-                memoire["derniere_publication"] = datetime.now(timezone.utc).isoformat()
-                sauvegarder_memoire(memoire)
+                manga = candidat
+                break
+            print(f"Échec pour {candidat} ({resultat.get('error')}), nouvel essai...")
+
+        print(f"Catégorie : {categorie} | Manga retenu : {manga}")
+        print("Résultat:", resultat)
+
+        if manga and "error" not in resultat:
+            deja_utilises.append(manga)
+            memoire["mangas_recents"] = deja_utilises[-150:]
+            memoire["derniere_publication"] = datetime.now(timezone.utc).isoformat()
+            sauvegarder_memoire(memoire)
