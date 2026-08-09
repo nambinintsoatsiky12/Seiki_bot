@@ -95,13 +95,31 @@ def sauvegarder_memoire(m):
         json.dump(m, f, ensure_ascii=False, indent=2)
 
 
-def trop_tot_pour_publier(memoire):
-    derniere = memoire.get("derniere_publication")
-    if derniere is None:
-        return False
-    ecart = datetime.now(timezone.utc) - datetime.fromisoformat(derniere)
-    return ecart < timedelta(minutes=DELAI_MINIMUM_MINUTES)
+if __name__ == "__main__":
+    memoire = charger_memoire()
+    categorie = categorie_actuelle()
+    deja_utilises = memoire.get("mangas_recents", [])
+    manga = None
+    resultat = {"error": "aucune tentative"}
 
+    for _ in range(4):
+        candidat = piocher_manga(deja_utilises)
+        if candidat is None:
+            continue
+        resultat = publier(categorie, candidat)
+        if "error" not in resultat:
+            manga = candidat
+            break
+        print(f"Échec pour {candidat} ({resultat.get('error')}), nouvel essai...")
+
+    print(f"Catégorie : {categorie} | Manga retenu : {manga}")
+    print("Résultat:", resultat)
+
+    if manga and "error" not in resultat:
+        deja_utilises.append(manga)
+        memoire["mangas_recents"] = deja_utilises[-150:]
+        memoire["derniere_publication"] = datetime.now(timezone.utc).isoformat()
+        sauvegarder_memoire(memoire)
 
 def piocher_manga(deja_utilises):
     if random.random() < 0.60:
