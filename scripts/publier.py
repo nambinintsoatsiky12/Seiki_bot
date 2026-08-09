@@ -13,7 +13,6 @@ GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
 FONT_URL = "https://github.com/google/fonts/raw/main/ofl/bangers/Bangers-Regular.ttf"
 FONT_PATH = "Bangers-Regular.ttf"
-DELAI_MINIMUM_MINUTES = 110
 LARGEUR_MINIMUM_IMAGE = 600
 
 MANGAS_CELEBRES = [
@@ -94,32 +93,6 @@ def sauvegarder_memoire(m):
     with open("memoire_publications.json", "w", encoding="utf-8") as f:
         json.dump(m, f, ensure_ascii=False, indent=2)
 
-
-if __name__ == "__main__":
-    memoire = charger_memoire()
-    categorie = categorie_actuelle()
-    deja_utilises = memoire.get("mangas_recents", [])
-    manga = None
-    resultat = {"error": "aucune tentative"}
-
-    for _ in range(4):
-        candidat = piocher_manga(deja_utilises)
-        if candidat is None:
-            continue
-        resultat = publier(categorie, candidat)
-        if "error" not in resultat:
-            manga = candidat
-            break
-        print(f"Échec pour {candidat} ({resultat.get('error')}), nouvel essai...")
-
-    print(f"Catégorie : {categorie} | Manga retenu : {manga}")
-    print("Résultat:", resultat)
-
-    if manga and "error" not in resultat:
-        deja_utilises.append(manga)
-        memoire["mangas_recents"] = deja_utilises[-150:]
-        memoire["derniere_publication"] = datetime.now(timezone.utc).isoformat()
-        sauvegarder_memoire(memoire)
 
 def piocher_manga(deja_utilises):
     if random.random() < 0.60:
@@ -262,30 +235,26 @@ def publier(categorie, manga):
 
 if __name__ == "__main__":
     memoire = charger_memoire()
+    categorie = categorie_actuelle()
+    deja_utilises = memoire.get("mangas_recents", [])
+    manga = None
+    resultat = {"error": "aucune tentative"}
 
-    if trop_tot_pour_publier(memoire):
-        print("Moins de 110 minutes depuis la dernière publication, on attend le prochain passage.")
-    else:
-        categorie = categorie_actuelle()
-        deja_utilises = memoire.get("mangas_recents", [])
-        manga = None
-        resultat = {"error": "aucune tentative"}
+    for _ in range(4):
+        candidat = piocher_manga(deja_utilises)
+        if candidat is None:
+            continue
+        resultat = publier(categorie, candidat)
+        if "error" not in resultat:
+            manga = candidat
+            break
+        print(f"Échec pour {candidat} ({resultat.get('error')}), nouvel essai...")
 
-        for _ in range(4):
-            candidat = piocher_manga(deja_utilises)
-            if candidat is None:
-                continue
-            resultat = publier(categorie, candidat)
-            if "error" not in resultat:
-                manga = candidat
-                break
-            print(f"Échec pour {candidat} ({resultat.get('error')}), nouvel essai...")
+    print(f"Catégorie : {categorie} | Manga retenu : {manga}")
+    print("Résultat:", resultat)
 
-        print(f"Catégorie : {categorie} | Manga retenu : {manga}")
-        print("Résultat:", resultat)
-
-        if manga and "error" not in resultat:
-            deja_utilises.append(manga)
-            memoire["mangas_recents"] = deja_utilises[-150:]
-            memoire["derniere_publication"] = datetime.now(timezone.utc).isoformat()
-            sauvegarder_memoire(memoire)
+    if manga and "error" not in resultat:
+        deja_utilises.append(manga)
+        memoire["mangas_recents"] = deja_utilises[-150:]
+        memoire["derniere_publication"] = datetime.now(timezone.utc).isoformat()
+        sauvegarder_memoire(memoire)
