@@ -13,7 +13,6 @@ GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
 FONT_URL = "https://github.com/google/fonts/raw/main/ofl/bangers/Bangers-Regular.ttf"
 FONT_PATH = "Bangers-Regular.ttf"
-LARGEUR_MINIMUM_IMAGE = 600
 
 MANGAS_CELEBRES = [
     "One Piece", "Naruto", "Attack on Titan", "Demon Slayer", "Jujutsu Kaisen",
@@ -172,8 +171,11 @@ def creer_image_stylee(image_url, titre_manga):
     r = requests.get(image_url)
     image = Image.open(BytesIO(r.content)).convert("RGB")
 
-    if image.width < LARGEUR_MINIMUM_IMAGE:
-        return None
+    largeur_cible = 1080
+    if image.width < largeur_cible:
+        ratio = largeur_cible / image.width
+        nouvelle_taille = (largeur_cible, int(image.height * ratio))
+        image = image.resize(nouvelle_taille, Image.LANCZOS)
 
     dessin = ImageDraw.Draw(image)
     taille = int(image.width / 10)
@@ -216,8 +218,6 @@ def publier(categorie, manga):
         return {"error": "image non trouvee"}
 
     image_stylee = creer_image_stylee(image_url, manga)
-    if image_stylee is None:
-        return {"error": "image trop basse resolution"}
 
     texte_brut = generer_texte_gemini(manga, categorie)
     corps = styliser_texte(texte_brut)
