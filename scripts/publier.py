@@ -27,7 +27,7 @@ MANGAS_CELEBRES = [
 SUJETS_FAITS = [
     "le cerveau humain", "le corps humain", "les animaux marins", "les insectes",
     "l'espace et l'univers", "les océans", "l'histoire ancienne", "la psychologie humaine",
-    "les records animaliers", "le sommeil et les rêves", "la nature extrême", "le règne animal","À propos de Google",
+    "les records animaliers", "le sommeil et les rêves", "la nature extrême", "le règne animal",
 ]
 
 CALENDRIER = {
@@ -47,7 +47,7 @@ ANGLES = {
         "cette phrase marque les fans."
     ),
     "trivia": (
-        "Commence OBLIGATOIREMENT par '🔥Le saviez-vous ?🔥' suivi d'une anecdote peu connue "
+        "Commence OBLIGATOIREMENT par 'Le saviez-vous ?' suivi d'une anecdote peu connue "
         "sur cet anime, son studio, ou sa production."
     ),
     "folklore": (
@@ -125,13 +125,17 @@ def piocher_manga(deja_utilises):
         }}"""
         variables = {}
 
-    resp = requests.post("https://graphql.anilist.co", json={"query": query, "variables": variables})
-    resultats = resp.json().get("data", {}).get("Page", {}).get("media", [])
-    noms = [(m["title"]["english"] or m["title"]["romaji"]) for m in resultats if m["title"]["romaji"] or m["title"]["english"]]
-    noms_dispo = [n for n in noms if n not in deja_utilises]
-    if not noms_dispo:
+    try:
+        resp = requests.post("https://graphql.anilist.co", json={"query": query, "variables": variables}, timeout=15)
+        resultats = resp.json().get("data", {}).get("Page", {}).get("media", [])
+        noms = [(m["title"]["english"] or m["title"]["romaji"]) for m in resultats if m["title"]["romaji"] or m["title"]["english"]]
+        noms_dispo = [n for n in noms if n not in deja_utilises]
+        if not noms_dispo:
+            return random.choice(MANGAS_CELEBRES)
+        return random.choice(noms_dispo)
+    except requests.exceptions.RequestException as e:
+        print("Erreur réseau AniList (piocher_manga):", e)
         return random.choice(MANGAS_CELEBRES)
-    return random.choice(noms_dispo)
 
 
 def piocher_image_pour_faits(sujet):
@@ -164,7 +168,7 @@ def piocher_image_pour_faits(sujet):
         "format": "json",
     }
     try:
-        r = requests.get(url, params=params, timeout=10)
+        r = requests.get(url, params=params, timeout=15)
         pages = r.json().get("query", {}).get("pages", {})
         candidats = []
         for page in pages.values():
@@ -173,8 +177,8 @@ def piocher_image_pour_faits(sujet):
                 candidats.append(infos[0]["thumburl"])
         if candidats:
             return random.choice(candidats)
-    except Exception:
-        pass
+    except requests.exceptions.RequestException as e:
+        print("Erreur réseau Wikimedia:", e)
 
     return None
 
@@ -189,17 +193,22 @@ def generer_texte_gemini(sujet, categorie):
         f"Ton chaleureux, accessible. Termine par une question qui invite au commentaire. "
         f"Ne mets aucun emoji (ils seront ajoutés séparément). Pas de titre, juste le texte."
     )
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={GEMINI_API_KEY}"
-    r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=15)
-    data = r.json()
-    if "candidates" not in data:
-        print("Réponse brute Gemini (échec):", data)
-        return (
-            f"Découvrez ou redécouvrez {sujet}, un sujet qui mérite clairement le détour. "
-            f"Une pépite à suivre de près.\n\n"
-            f"Et vous, vous connaissiez déjà ça ? Dites-le en commentaire !"
-        )
-    return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+    texte_secours = (
+        f"Découvrez ou redécouvrez {sujet}, un sujet qui mérite clairement le détour. "
+        f"Une pépite à suivre de près.\n\n"
+        f"Et vous, vous connaissiez déjà ça ? Dites-le en commentaire !"
+    )
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={GEMINI_API_KEY}"
+        r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=25)
+        data = r.json()
+        if "candidates" not in data:
+            print("Réponse brute Gemini (échec):", data)
+            return texte_secours
+        return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+    except requests.exceptions.RequestException as e:
+        print("Erreur réseau Gemini (timeout ou connexion):", e)
+        return texte_secours
 
 
 def recuperer_image_anilist(titre_manga):
@@ -211,23 +220,27 @@ def recuperer_image_anilist(titre_manga):
       }
     }
     """
-    r = requests.post("https://graphql.anilist.co", json={"query": query, "variables": {"search": titre_manga}})
-    media = r.json().get("data", {}).get("Media")
-    if media is None or media.get("isAdult"):
+    try:
+        r = requests.post("https://graphql.anilist.co", json={"query": query, "variables": {"search": titre_manga}}, timeout=15)
+        media = r.json().get("data", {}).get("Media")
+        if media is None or media.get("isAdult"):
+            return None
+        return media["coverImage"]["extraLarge"]
+    except requests.exceptions.RequestException as e:
+        print("Erreur réseau AniList (image):", e)
         return None
-    return media["coverImage"]["extraLarge"]
 
 
 def telecharger_police():
     if not os.path.exists(FONT_PATH):
-        r = requests.get(FONT_URL)
+        r = requests.get(FONT_URL, timeout=15)
         with open(FONT_PATH, "wb") as f:
             f.write(r.content)
 
 
 def creer_image_stylee(image_url, titre):
     telecharger_police()
-    r = requests.get(image_url)
+    r = requests.get(image_url, timeout=15)
     image = Image.open(BytesIO(r.content)).convert("RGB")
 
     largeur_cible = 1080
@@ -283,7 +296,12 @@ def publier(categorie, sujet):
         if image_url is None:
             return {"error": "image non trouvee"}
 
-    image_stylee = creer_image_stylee(image_url, titre_affiche)
+    try:
+        image_stylee = creer_image_stylee(image_url, titre_affiche)
+    except Exception as e:
+        print("Erreur création image:", e)
+        return {"error": "creation image echouee"}
+
     texte_brut = generer_texte_gemini(sujet, categorie)
     corps = styliser_texte(texte_brut)
     titre = titre_affiche.upper().translate(TABLE_TITRE)
@@ -291,12 +309,17 @@ def publier(categorie, sujet):
     hashtag_sujet = titre_affiche.replace(" ", "").replace("'", "")
     legende = f"{accroche}\n\n{PREFIXES.get(categorie,'✨')} {titre}\n\n{corps}\n\n{random.choice(EMOJIS_FIN)} #{hashtag_sujet} #manga #anime"
 
-    r = requests.post(
-        f"https://graph.facebook.com/v21.0/{PAGE_ID}/photos",
-        data={"caption": legende, "access_token": PAGE_ACCESS_TOKEN},
-        files={"source": ("image.jpg", image_stylee, "image/jpeg")}
-    )
-    return r.json()
+    try:
+        r = requests.post(
+            f"https://graph.facebook.com/v21.0/{PAGE_ID}/photos",
+            data={"caption": legende, "access_token": PAGE_ACCESS_TOKEN},
+            files={"source": ("image.jpg", image_stylee, "image/jpeg")},
+            timeout=30
+        )
+        return r.json()
+    except requests.exceptions.RequestException as e:
+        print("Erreur réseau Facebook:", e)
+        return {"error": "publication facebook echouee"}
 
 
 if __name__ == "__main__":
