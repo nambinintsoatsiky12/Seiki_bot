@@ -24,14 +24,21 @@ MANGAS_CELEBRES = [
     "Solo Leveling", "Berserk", "Vagabond", "Slam Dunk", "Rurouni Kenshin",
 ]
 
+SUJETS_FAITS = [
+    "le cerveau humain", "le corps humain", "les animaux marins", "les insectes",
+    "l'espace et l'univers", "les océans", "l'histoire ancienne", "la psychologie humaine",
+    "les records animaliers", "le sommeil et les rêves", "la nature extrême", "le règne animal","À propos de Google",
+]
+
 CALENDRIER = {
-    8: "citations", 10: "trivia", 12: "citations", 14: "folklore",
-    16: "comparatif", 18: "trivia", 20: "portraits", 22: "citations",
-    0: "retrospectives", 2: "folklore", 4: "citations", 6: "trivia",
+    8: "citations", 10: "faits", 12: "citations", 14: "folklore",
+    16: "comparatif", 18: "faits", 20: "portraits", 22: "citations",
+    0: "retrospectives", 2: "faits", 4: "trivia", 6: "faits",
 }
 PREFIXES = {
     "citations": "🔥📖", "trivia": "🧐✨", "folklore": "🌙👹",
     "comparatif": "⚖️📺", "portraits": "🖋️👤", "retrospectives": "⏳📚",
+    "faits": "🤯🌍",
 }
 ANGLES = {
     "citations": (
@@ -40,7 +47,7 @@ ANGLES = {
         "cette phrase marque les fans."
     ),
     "trivia": (
-        "Commence OBLIGATOIREMENT par 'Le saviez-vous ?' suivi d'une anecdote peu connue "
+        "Commence OBLIGATOIREMENT par '🔥Le saviez-vous ?🔥' suivi d'une anecdote peu connue "
         "sur cet anime, son studio, ou sa production."
     ),
     "folklore": (
@@ -58,6 +65,13 @@ ANGLES = {
     "retrospectives": (
         "Commence OBLIGATOIREMENT par une phrase du type 'Retour sur...' et regarde en arrière "
         "sur l'impact ou l'héritage de cet anime dans le temps."
+    ),
+    "faits": (
+        "Commence OBLIGATOIREMENT par 'Le savais-tu ?' suivi d'un fait vrai, vérifiable et "
+        "fascinant sur ce sujet précis. Développe avec du contexte scientifique ou historique "
+        "réel, en 3 à 5 paragraphes complets. Ne parle JAMAIS de personnes réelles identifiables, "
+        "de violence, de torture, ou de théories non vérifiées — reste sur des faits factuels "
+        "et positifs (science, nature, corps humain, histoire, espace)."
     ),
 }
 ACCROCHES = ["🚨 ARRÊTE DE SCROLLER 🚨", "😱 ATTENDS VOIR ÇA 😱", "🔥 ÇA VA TE MARQUER 🔥", "👀 REGARDE ÇA DE PRÈS 👀", "⚡ ON EN PARLE ⚡", "💎 PÉPITE MÉCONNUE 💎"]
@@ -120,14 +134,59 @@ def piocher_manga(deja_utilises):
     return random.choice(noms_dispo)
 
 
-def generer_texte_gemini(manga, categorie):
-    consigne = ANGLES.get(categorie, "un fait intéressant sur cet anime")
+def piocher_image_pour_faits(sujet):
+    requetes = {
+        "le cerveau humain": "human brain anatomy",
+        "le corps humain": "human anatomy",
+        "les animaux marins": "marine animal ocean",
+        "les insectes": "insect macro photography",
+        "l'espace et l'univers": "galaxy nebula space",
+        "les océans": "deep sea ocean",
+        "l'histoire ancienne": "ancient artifact archaeology",
+        "la psychologie humaine": "human mind brain",
+        "les records animaliers": "wild animal",
+        "le sommeil et les rêves": "night sky stars",
+        "la nature extrême": "extreme nature landscape",
+        "le règne animal": "wildlife animal",
+    }
+    terme = requetes.get(sujet, "nature")
+
+    url = "https://commons.wikimedia.org/w/api.php"
+    params = {
+        "action": "query",
+        "generator": "search",
+        "gsrsearch": f"{terme} filetype:bitmap",
+        "gsrlimit": 15,
+        "gsrnamespace": 6,
+        "prop": "imageinfo",
+        "iiprop": "url",
+        "iiurlwidth": 1080,
+        "format": "json",
+    }
+    try:
+        r = requests.get(url, params=params, timeout=10)
+        pages = r.json().get("query", {}).get("pages", {})
+        candidats = []
+        for page in pages.values():
+            infos = page.get("imageinfo", [])
+            if infos and infos[0].get("thumburl", "").lower().endswith((".jpg", ".jpeg", ".png")):
+                candidats.append(infos[0]["thumburl"])
+        if candidats:
+            return random.choice(candidats)
+    except Exception:
+        pass
+
+    return None
+
+
+def generer_texte_gemini(sujet, categorie):
+    consigne = ANGLES.get(categorie, "un fait intéressant")
     prompt = (
         f"Tu es le community manager d'une page Facebook manga/surnaturel appelée 'La piraterie'. "
-        f"Écris un post Facebook de 3 à 5 courts paragraphes sur l'anime '{manga}'. "
+        f"Écris un post Facebook de 3 à 5 courts paragraphes sur '{sujet}'. "
         f"CONSIGNE DE FORMAT STRICTE À RESPECTER : {consigne}\n"
-        f"Si tu ne connais pas bien ce titre précis, reste factuel et prudent, n'invente jamais de fausses infos. "
-        f"Ton chaleureux, fan d'anime, accessible. Termine par une question qui invite au commentaire. "
+        f"Si tu ne connais pas bien ce sujet précis, reste factuel et prudent, n'invente jamais de fausses infos. "
+        f"Ton chaleureux, accessible. Termine par une question qui invite au commentaire. "
         f"Ne mets aucun emoji (ils seront ajoutés séparément). Pas de titre, juste le texte."
     )
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={GEMINI_API_KEY}"
@@ -136,9 +195,9 @@ def generer_texte_gemini(manga, categorie):
     if "candidates" not in data:
         print("Réponse brute Gemini (échec):", data)
         return (
-            f"Découvrez ou redécouvrez {manga}, une œuvre qui mérite clairement le détour. "
-            f"Une pépite à suivre de près pour tout fan qui se respecte.\n\n"
-            f"Et vous, vous connaissez cet anime ? Dites-le en commentaire !"
+            f"Découvrez ou redécouvrez {sujet}, un sujet qui mérite clairement le détour. "
+            f"Une pépite à suivre de près.\n\n"
+            f"Et vous, vous connaissiez déjà ça ? Dites-le en commentaire !"
         )
     return data["candidates"][0]["content"]["parts"][0]["text"].strip()
 
@@ -166,7 +225,7 @@ def telecharger_police():
             f.write(r.content)
 
 
-def creer_image_stylee(image_url, titre_manga):
+def creer_image_stylee(image_url, titre):
     telecharger_police()
     r = requests.get(image_url)
     image = Image.open(BytesIO(r.content)).convert("RGB")
@@ -180,7 +239,7 @@ def creer_image_stylee(image_url, titre_manga):
     dessin = ImageDraw.Draw(image)
     taille = int(image.width / 10)
     police = ImageFont.truetype(FONT_PATH, taille)
-    texte = titre_manga.upper()
+    texte = titre.upper()
     boite = dessin.textbbox((0, 0), texte, font=police)
     x = (image.width - (boite[2] - boite[0])) / 2
     y = image.height - taille * 1.8
@@ -212,18 +271,25 @@ def styliser_texte(texte):
     return "\n\n".join(styliser_paragraphe(p) for p in texte.split("\n\n") if p.strip())
 
 
-def publier(categorie, manga):
-    image_url = recuperer_image_anilist(manga)
-    if image_url is None:
-        return {"error": "image non trouvee"}
+def publier(categorie, sujet):
+    if categorie == "faits":
+        image_url = piocher_image_pour_faits(sujet)
+        titre_affiche = sujet.capitalize()
+        if image_url is None:
+            return {"error": "image non trouvee"}
+    else:
+        image_url = recuperer_image_anilist(sujet)
+        titre_affiche = sujet
+        if image_url is None:
+            return {"error": "image non trouvee"}
 
-    image_stylee = creer_image_stylee(image_url, manga)
-
-    texte_brut = generer_texte_gemini(manga, categorie)
+    image_stylee = creer_image_stylee(image_url, titre_affiche)
+    texte_brut = generer_texte_gemini(sujet, categorie)
     corps = styliser_texte(texte_brut)
-    titre = manga.upper().translate(TABLE_TITRE)
+    titre = titre_affiche.upper().translate(TABLE_TITRE)
     accroche = random.choice(ACCROCHES).translate(TABLE_ACCROCHE)
-    legende = f"{accroche}\n\n{PREFIXES.get(categorie,'✨')} {titre}\n\n{corps}\n\n{random.choice(EMOJIS_FIN)} #{manga.replace(' ','')} #manga #anime"
+    hashtag_sujet = titre_affiche.replace(" ", "").replace("'", "")
+    legende = f"{accroche}\n\n{PREFIXES.get(categorie,'✨')} {titre}\n\n{corps}\n\n{random.choice(EMOJIS_FIN)} #{hashtag_sujet} #manga #anime"
 
     r = requests.post(
         f"https://graph.facebook.com/v21.0/{PAGE_ID}/photos",
@@ -237,24 +303,29 @@ if __name__ == "__main__":
     memoire = charger_memoire()
     categorie = categorie_actuelle()
     deja_utilises = memoire.get("mangas_recents", [])
-    manga = None
+    sujet_retenu = None
     resultat = {"error": "aucune tentative"}
 
     for _ in range(4):
-        candidat = piocher_manga(deja_utilises)
+        if categorie == "faits":
+            dispo = [s for s in SUJETS_FAITS if s not in deja_utilises] or SUJETS_FAITS
+            candidat = random.choice(dispo)
+        else:
+            candidat = piocher_manga(deja_utilises)
+
         if candidat is None:
             continue
         resultat = publier(categorie, candidat)
         if "error" not in resultat:
-            manga = candidat
+            sujet_retenu = candidat
             break
         print(f"Échec pour {candidat} ({resultat.get('error')}), nouvel essai...")
 
-    print(f"Catégorie : {categorie} | Manga retenu : {manga}")
+    print(f"Catégorie : {categorie} | Sujet retenu : {sujet_retenu}")
     print("Résultat:", resultat)
 
-    if manga and "error" not in resultat:
-        deja_utilises.append(manga)
+    if sujet_retenu and "error" not in resultat:
+        deja_utilises.append(sujet_retenu)
         memoire["mangas_recents"] = deja_utilises[-150:]
         memoire["derniere_publication"] = datetime.now(timezone.utc).isoformat()
         sauvegarder_memoire(memoire)
