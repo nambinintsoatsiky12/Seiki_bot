@@ -6,6 +6,7 @@ import requests
 from io import BytesIO
 from datetime import datetime, timezone, timedelta
 from PIL import Image, ImageDraw, ImageFont
+import unicodedata
 
 PAGE_ACCESS_TOKEN = os.environ["PAGE_ACCESS_TOKEN"]
 PAGE_ID = os.environ["PAGE_ID"]
@@ -28,6 +29,8 @@ SUJETS_FAITS = [
     "le cerveau humain", "le corps humain", "les animaux marins", "les insectes",
     "l'espace et l'univers", "les océans", "l'histoire ancienne", "la psychologie humaine",
     "les records animaliers", "le sommeil et les rêves", "la nature extrême", "le règne animal",
+    # Nouveaux sujets sur le web et Google
+    "les secrets de Google", "les coulisses du web",
 ]
 
 CALENDRIER = {
@@ -68,19 +71,21 @@ ANGLES = {
     ),
     "faits": (
         "Commence OBLIGATOIREMENT par 'Le savais-tu ?' suivi d'un fait vrai, vérifiable et "
-        "fascinant sur ce sujet précis. Développe avec du contexte scientifique ou historique "
-        "réel, en 3 à 5 paragraphes complets. Ne parle JAMAIS de personnes réelles identifiables, "
-        "de violence, de torture, ou de théories non vérifiées — reste sur des faits factuels "
-        "et positifs (science, nature, corps humain, histoire, espace)."
+        "fascinant sur ce sujet précis. Développe avec du contexte scientifique, historique ou "
+        "technologique réel, en 3 à 5 paragraphes complets. Ne parle JAMAIS de personnes réelles "
+        "identifiables, de violence, ou de théories non vérifiées — reste sur des faits factuels "
+        "et positifs (science, nature, corps humain, histoire, espace, web, technologie)."
     ),
 }
 ACCROCHES = ["🚨 ARRÊTE DE SCROLLER 🚨", "😱 ATTENDS VOIR ÇA 😱", "🔥 ÇA VA TE MARQUER 🔥", "👀 REGARDE ÇA DE PRÈS 👀", "⚡ ON EN PARLE ⚡", "💎 PÉPITE MÉCONNUE 💎"]
 EMOJIS_FIN = ["🔥", "😤", "💯", "🥷", "⚔️", "😭", "👑", "🎌"]
 EMOJIS_PARAGRAPHE = ["💥", "😨", "🤯", "😮‍💨", "👊", "🩸", "⚡", "🖤"]
+# Pour les faits, on utilise des emojis plus neutres
+EMOJIS_PARAGRAPHE_FAITS = ["✨", "🌍", "🔬", "🧠", "🌿", "📚", "💡", "🌐"]
 
 NORMAL = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 ITALIQUE = "𝘢𝘣𝘤𝘥𝘦𝘧𝘨𝘩𝘪𝘫𝘬𝘭𝘮𝘯𝘰𝘱𝘲𝘳𝘴𝘵𝘶𝘷𝘸𝘹𝘺𝘻𝘈𝘉𝘊𝘋𝘌𝘍𝘎𝘏𝘐𝘑𝘒𝘓𝘔𝘕𝘖𝘗𝘘𝘙𝘚𝘛𝘜𝘝𝘞𝘟𝘠𝘡𝟢𝟣𝟤𝟥𝟦𝟧𝟨𝟩𝟪𝟫"
-GRAS = "𝗮𝗯𝗰𝗱𝗲𝗳𝗴𝗵𝗶𝗷𝗸𝗹𝗺𝗻𝗼𝗽𝗾𝗿𝘀𝘁𝘂𝘃𝘄𝘅𝘆𝘇𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭𝟬𝟭𝟮𝟯𝟰𝟱𝟲𝟳𝟴𝟵"
+GRAS = "𝗮𝗯𝗰𝗱𝗲𝗳𝗴𝗵𝗶𝗷𝗸𝗹𝗺𝗻𝗼𝗽𝗾𝗿𝘀𝘁𝘂𝘃𝘄𝘅𝘺𝘇𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭𝟬𝟭𝟮𝟯𝟰𝟱𝟲𝟳𝟴𝟵"
 ACCROCHE_STYLE = "𝙖𝙗𝙘𝙙𝙚𝙛𝙜𝙝𝙞𝙟𝙠𝙡𝙢𝙣𝙤𝙥𝙦𝙧𝙨𝙩𝙪𝙫𝙬𝙭𝙮𝙯𝘼𝘽𝘾𝘿𝙀𝙁𝙂𝙃𝙄𝙅𝙆𝙇𝙈𝙉𝙊𝙋𝙌𝙍𝙎𝙏𝙐𝙑𝙒𝙓𝙔𝙕0123456789"
 TITRE_STYLE = "𝐚𝐛𝐜𝐝𝐞𝐟𝐠𝐡𝐢𝐣𝐤𝐥𝐦𝐧𝐨𝐩𝐪𝐫𝐬𝐭𝐮𝐯𝐰𝐱𝐲𝐳𝐀𝐁𝐂𝐃𝐄𝐅𝐆𝐇𝐈𝐉𝐊𝐋𝐌𝐍𝐎𝐏𝐐𝐑𝐒𝐓𝐔𝐕𝐖𝐗𝐘𝐙𝟎𝟏𝟐𝟑𝟒𝟓𝟔𝟕𝟖𝟗"
 TABLE_ITALIQUE = str.maketrans(NORMAL, ITALIQUE)
@@ -90,16 +95,49 @@ TABLE_TITRE = str.maketrans(NORMAL, TITRE_STYLE)
 MOTS_A_IGNORER = {"cette","avec","pour","dans","leur","leurs","elle","aussi","mais","plus","être","avoir","tout","tous","toute","toutes","comme","entre","sans","encore","depuis","avant","après","parce","alors"}
 
 
+def sans_accents(texte):
+    """Enlève les accents pour éviter les problèmes de mapping."""
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', texte)
+        if unicodedata.category(c) != 'Mn'
+    )
+
+
 def categorie_actuelle():
+    """Retourne la catégorie en fonction de l'heure de Paris."""
     h = (datetime.now(timezone.utc) + timedelta(hours=3)).hour
-    return CALENDRIER[min(CALENDRIER.keys(), key=lambda x: abs(x - h))]
+    # Plages horaires simplifiées
+    if 6 <= h < 10:
+        return "faits"
+    elif 10 <= h < 12:
+        return "citations"
+    elif 12 <= h < 14:
+        return "faits"
+    elif 14 <= h < 16:
+        return "folklore"
+    elif 16 <= h < 18:
+        return "comparatif"
+    elif 18 <= h < 20:
+        return "faits"
+    elif 20 <= h < 22:
+        return "portraits"
+    elif 22 <= h < 24:
+        return "citations"
+    else:  # 0h - 6h
+        return "retrospectives"
 
 
 def charger_memoire():
     if os.path.exists("memoire_publications.json"):
         with open("memoire_publications.json", "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {"mangas_recents": [], "derniere_publication": None}
+            data = json.load(f)
+            # Initialiser les listes si absentes (pour compatibilité)
+            if "mangas_recents" not in data:
+                data["mangas_recents"] = []
+            if "faits_recents" not in data:
+                data["faits_recents"] = []
+            return data
+    return {"mangas_recents": [], "faits_recents": [], "derniere_publication": None}
 
 
 def sauvegarder_memoire(m):
@@ -127,6 +165,7 @@ def piocher_manga(deja_utilises):
 
     try:
         resp = requests.post("https://graphql.anilist.co", json={"query": query, "variables": variables}, timeout=15)
+        resp.raise_for_status()
         resultats = resp.json().get("data", {}).get("Page", {}).get("media", [])
         noms = [(m["title"]["english"] or m["title"]["romaji"]) for m in resultats if m["title"]["romaji"] or m["title"]["english"]]
         noms_dispo = [n for n in noms if n not in deja_utilises]
@@ -139,6 +178,7 @@ def piocher_manga(deja_utilises):
 
 
 def piocher_image_pour_faits(sujet):
+    """Recherche une image sur Wikimedia Commons pour les sujets factuels."""
     requetes = {
         "le cerveau humain": "human brain anatomy",
         "le corps humain": "human anatomy",
@@ -152,35 +192,48 @@ def piocher_image_pour_faits(sujet):
         "le sommeil et les rêves": "night sky stars",
         "la nature extrême": "extreme nature landscape",
         "le règne animal": "wildlife animal",
+        # Nouvelles entrées pour le web
+        "les secrets de Google": "Google data center technology",
+        "les coulisses du web": "internet infrastructure server room",
     }
     terme = requetes.get(sujet, "nature")
 
+    headers = {
+        "User-Agent": "LaPiraterieBot/1.0 (contact: ton-email@example.com)"
+    }
     url = "https://commons.wikimedia.org/w/api.php"
     params = {
         "action": "query",
         "generator": "search",
-        "gsrsearch": f"{terme} filetype:bitmap",
-        "gsrlimit": 15,
+        "gsrsearch": terme,
+        "gsrlimit": 20,
         "gsrnamespace": 6,
         "prop": "imageinfo",
         "iiprop": "url",
         "iiurlwidth": 1080,
         "format": "json",
     }
+
     try:
-        r = requests.get(url, params=params, timeout=15)
-        pages = r.json().get("query", {}).get("pages", {})
+        r = requests.get(url, params=params, headers=headers, timeout=15)
+        r.raise_for_status()
+        data = r.json()
+        pages = data.get("query", {}).get("pages", {})
         candidats = []
         for page in pages.values():
             infos = page.get("imageinfo", [])
-            if infos and infos[0].get("thumburl", "").lower().endswith((".jpg", ".jpeg", ".png")):
-                candidats.append(infos[0]["thumburl"])
+            if infos:
+                image_url = infos[0].get("thumburl") or infos[0].get("url")
+                if image_url and image_url.lower().endswith((".jpg", ".jpeg", ".png")):
+                    candidats.append(image_url)
         if candidats:
             return random.choice(candidats)
-    except requests.exceptions.RequestException as e:
-        print("Erreur réseau Wikimedia:", e)
-
-    return None
+        else:
+            print(f"Aucune image trouvée pour {sujet} sur Wikimedia Commons.")
+            return None
+    except Exception as e:
+        print(f"Erreur Wikimedia pour {sujet}: {e}")
+        return None
 
 
 def generer_texte_gemini(sujet, categorie):
@@ -199,15 +252,25 @@ def generer_texte_gemini(sujet, categorie):
         f"Et vous, vous connaissiez déjà ça ? Dites-le en commentaire !"
     )
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={GEMINI_API_KEY}"
-        r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=25)
-        data = r.json()
-        if "candidates" not in data:
-            print("Réponse brute Gemini (échec):", data)
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        headers = {"Content-Type": "application/json"}
+        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        resp = requests.post(url, json=payload, headers=headers, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        if "candidates" in data:
+            return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        else:
+            print("Réponse Gemini inattendue :", data)
             return texte_secours
-        return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+    except requests.exceptions.Timeout:
+        print("Timeout Gemini")
+        return texte_secours
     except requests.exceptions.RequestException as e:
-        print("Erreur réseau Gemini (timeout ou connexion):", e)
+        print(f"Erreur réseau Gemini : {e}")
+        return texte_secours
+    except (KeyError, IndexError, json.JSONDecodeError) as e:
+        print(f"Erreur parsing Gemini : {e}")
         return texte_secours
 
 
@@ -222,6 +285,7 @@ def recuperer_image_anilist(titre_manga):
     """
     try:
         r = requests.post("https://graphql.anilist.co", json={"query": query, "variables": {"search": titre_manga}}, timeout=15)
+        r.raise_for_status()
         media = r.json().get("data", {}).get("Media")
         if media is None or media.get("isAdult"):
             return None
@@ -233,16 +297,43 @@ def recuperer_image_anilist(titre_manga):
 
 def telecharger_police():
     if not os.path.exists(FONT_PATH):
-        r = requests.get(FONT_URL, timeout=15)
-        with open(FONT_PATH, "wb") as f:
-            f.write(r.content)
+        try:
+            r = requests.get(FONT_URL, timeout=15)
+            r.raise_for_status()
+            with open(FONT_PATH, "wb") as f:
+                f.write(r.content)
+        except Exception as e:
+            print(f"Erreur téléchargement police : {e}")
+            # On continue sans police personnalisée, utilisation de la police par défaut plus bas
 
 
 def creer_image_stylee(image_url, titre):
+    """Crée une image stylisée avec le titre. Si image_url est None, génère un fond dégradé."""
     telecharger_police()
-    r = requests.get(image_url, timeout=15)
-    image = Image.open(BytesIO(r.content)).convert("RGB")
+    if image_url is None:
+        # Image de fond générée (dégradé simple)
+        largeur = 1080
+        hauteur = 1080
+        image = Image.new("RGB", (largeur, hauteur))
+        pixels = image.load()
+        for y in range(hauteur):
+            for x in range(largeur):
+                # Dégradé du bleu nuit au violet
+                r = int(30 + (80 - 30) * (x / largeur))
+                g = int(30 + (50 - 30) * (y / hauteur))
+                b = int(60 + (120 - 60) * ((x + y) / (largeur + hauteur)))
+                pixels[x, y] = (r, g, b)
+    else:
+        try:
+            r = requests.get(image_url, timeout=15)
+            r.raise_for_status()
+            image = Image.open(BytesIO(r.content)).convert("RGB")
+        except Exception as e:
+            print(f"Erreur récupération image : {e}, utilisation fond par défaut")
+            # Image de secours
+            image = Image.new("RGB", (1080, 1080), color=(40, 40, 80))
 
+    # Redimensionnement si trop petit
     largeur_cible = 1080
     if image.width < largeur_cible:
         ratio = largeur_cible / image.width
@@ -250,52 +341,80 @@ def creer_image_stylee(image_url, titre):
         image = image.resize(nouvelle_taille, Image.LANCZOS)
 
     dessin = ImageDraw.Draw(image)
-    taille = int(image.width / 10)
-    police = ImageFont.truetype(FONT_PATH, taille)
+
+    # Taille de police adaptative : on réduit si le texte est trop long
     texte = titre.upper()
-    boite = dessin.textbbox((0, 0), texte, font=police)
-    x = (image.width - (boite[2] - boite[0])) / 2
-    y = image.height - taille * 1.8
+    # Supprimer les accents pour éviter les problèmes de rendu
+    texte_sans_accents = sans_accents(texte)
+    taille = int(image.width / 8)
+    police = None
+    while taille > 20:
+        try:
+            police = ImageFont.truetype(FONT_PATH, taille)
+        except:
+            police = ImageFont.load_default()
+            break
+        bbox = dessin.textbbox((0, 0), texte_sans_accents, font=police)
+        largeur_texte = bbox[2] - bbox[0]
+        if largeur_texte <= image.width * 0.9:
+            break
+        taille -= 5
+
+    # Position en bas, centré
+    bbox = dessin.textbbox((0, 0), texte_sans_accents, font=police)
+    x = (image.width - (bbox[2] - bbox[0])) / 2
+    y = image.height - taille * 2.0
+
+    # Ombre portée
     for dx in range(-3, 4):
         for dy in range(-3, 4):
-            dessin.text((x + dx, y + dy), texte, font=police, fill="black")
-    dessin.text((x, y), texte, font=police, fill="white")
+            dessin.text((x + dx, y + dy), texte_sans_accents, font=police, fill="black")
+    dessin.text((x, y), texte_sans_accents, font=police, fill="white")
+
     sortie = BytesIO()
     image.save(sortie, format="JPEG", quality=95)
     sortie.seek(0)
     return sortie
 
 
-def styliser_paragraphe(p):
+def styliser_paragraphe(p, categorie):
+    """Stylise un paragraphe : ajoute un emoji et transforme certains mots."""
     mots = p.split(" ")
     candidats = [i for i, m in enumerate(mots) if len(re.sub(r"[^\wéèêàâçùûîï]", "", m)) >= 7 and m.lower().strip(",.!?»«") not in MOTS_A_IGNORER]
     marques = set(random.sample(candidats, min(2, len(candidats)))) if candidats else set()
     out = []
     for i, m in enumerate(mots):
+        mot_sans_accents = sans_accents(m)
         if i in marques:
-            propre = m.strip(",.!?»«")
+            propre = mot_sans_accents.strip(",.!?»«")
             out.append(f"#{propre.upper().translate(TABLE_GRAS)}")
         else:
-            out.append(m.translate(TABLE_ITALIQUE))
-    return random.choice(EMOJIS_PARAGRAPHE) + " " + " ".join(out)
+            out.append(mot_sans_accents.translate(TABLE_ITALIQUE))
+    # Choix d'un emoji selon la catégorie
+    if categorie == "faits":
+        emoji = random.choice(EMOJIS_PARAGRAPHE_FAITS)
+    else:
+        emoji = random.choice(EMOJIS_PARAGRAPHE)
+    return emoji + " " + " ".join(out)
 
 
-def styliser_texte(texte):
-    return "\n\n".join(styliser_paragraphe(p) for p in texte.split("\n\n") if p.strip())
+def styliser_texte(texte, categorie):
+    """Applique la stylisation paragraphe par paragraphe."""
+    return "\n\n".join(styliser_paragraphe(p, categorie) for p in texte.split("\n\n") if p.strip())
 
 
 def publier(categorie, sujet):
+    """Prépare et publie le contenu sur Facebook."""
     if categorie == "faits":
         image_url = piocher_image_pour_faits(sujet)
         titre_affiche = sujet.capitalize()
-        if image_url is None:
-            return {"error": "image non trouvee"}
     else:
         image_url = recuperer_image_anilist(sujet)
         titre_affiche = sujet
         if image_url is None:
             return {"error": "image non trouvee"}
 
+    # Si image_url est None pour les faits, on utilise quand même une image de fond générée
     try:
         image_stylee = creer_image_stylee(image_url, titre_affiche)
     except Exception as e:
@@ -303,7 +422,7 @@ def publier(categorie, sujet):
         return {"error": "creation image echouee"}
 
     texte_brut = generer_texte_gemini(sujet, categorie)
-    corps = styliser_texte(texte_brut)
+    corps = styliser_texte(texte_brut, categorie)
     titre = titre_affiche.upper().translate(TABLE_TITRE)
     accroche = random.choice(ACCROCHES).translate(TABLE_ACCROCHE)
     hashtag_sujet = titre_affiche.replace(" ", "").replace("'", "")
@@ -316,6 +435,7 @@ def publier(categorie, sujet):
             files={"source": ("image.jpg", image_stylee, "image/jpeg")},
             timeout=30
         )
+        r.raise_for_status()
         return r.json()
     except requests.exceptions.RequestException as e:
         print("Erreur réseau Facebook:", e)
@@ -325,7 +445,13 @@ def publier(categorie, sujet):
 if __name__ == "__main__":
     memoire = charger_memoire()
     categorie = categorie_actuelle()
-    deja_utilises = memoire.get("mangas_recents", [])
+
+    # Sélection de la liste de sujets déjà utilisés selon la catégorie
+    if categorie == "faits":
+        deja_utilises = memoire.get("faits_recents", [])
+    else:
+        deja_utilises = memoire.get("mangas_recents", [])
+
     sujet_retenu = None
     resultat = {"error": "aucune tentative"}
 
@@ -348,7 +474,12 @@ if __name__ == "__main__":
     print("Résultat:", resultat)
 
     if sujet_retenu and "error" not in resultat:
-        deja_utilises.append(sujet_retenu)
-        memoire["mangas_recents"] = deja_utilises[-150:]
+        # Mise à jour de la mémoire selon la catégorie
+        if categorie == "faits":
+            memoire.setdefault("faits_recents", []).append(sujet_retenu)
+            memoire["faits_recents"] = memoire["faits_recents"][-150:]
+        else:
+            memoire.setdefault("mangas_recents", []).append(sujet_retenu)
+            memoire["mangas_recents"] = memoire["mangas_recents"][-150:]
         memoire["derniere_publication"] = datetime.now(timezone.utc).isoformat()
         sauvegarder_memoire(memoire)
