@@ -29,20 +29,19 @@ SUJETS_FAITS = [
     "le cerveau humain", "le corps humain", "les animaux marins", "les insectes",
     "l'espace et l'univers", "les océans", "l'histoire ancienne", "la psychologie humaine",
     "les records animaliers", "le sommeil et les rêves", "la nature extrême", "le règne animal",
-    # Nouveaux sujets sur le web et Google
     "les secrets de Google", "les coulisses du web",
 ]
 
-CALENDRIER = {
-    8: "citations", 10: "faits", 12: "citations", 14: "folklore",
-    16: "comparatif", 18: "faits", 20: "portraits", 22: "citations",
-    0: "retrospectives", 2: "faits", 4: "trivia", 6: "faits",
-}
+# Nouvelles catégories
+CATEGORIES_MANGA = ["citations", "trivia", "folklore", "comparatif", "portraits", "retrospectives"]
+CATEGORIES_NON_MANGA = ["faits", "tristes", "chanceux"]
+
 PREFIXES = {
     "citations": "🔥📖", "trivia": "🧐✨", "folklore": "🌙👹",
     "comparatif": "⚖️📺", "portraits": "🖋️👤", "retrospectives": "⏳📚",
-    "faits": "🤯🌍",
+    "faits": "🤯🌍", "tristes": "😢💔", "chanceux": "🍀✨"
 }
+
 ANGLES = {
     "citations": (
         "Commence OBLIGATOIREMENT par une réplique culte de l'anime entre guillemets français, "
@@ -76,12 +75,25 @@ ANGLES = {
         "identifiables, de violence, ou de théories non vérifiées — reste sur des faits factuels "
         "et positifs (science, nature, corps humain, histoire, espace, web, technologie)."
     ),
+    "tristes": (
+        "Raconte une histoire vraie triste et marquante de l'histoire mondiale (par exemple un événement "
+        "historique émouvant, une catastrophe naturelle, un destin tragique). Sois factuel, respectueux, "
+        "sans détails graphiques. Termine par une réflexion ou une question qui invite au commentaire."
+    ),
+    "chanceux": (
+        "Raconte une histoire vraie incroyable de chance ou de coïncidence (survivant miraculeux, gagnant "
+        "de loterie improbable, sauvetage impossible). Reste factuel et cite des sources si possible. "
+        "Termine par une question qui invite au commentaire."
+    ),
 }
+
 ACCROCHES = ["🚨 ARRÊTE DE SCROLLER 🚨", "😱 ATTENDS VOIR ÇA 😱", "🔥 ÇA VA TE MARQUER 🔥", "👀 REGARDE ÇA DE PRÈS 👀", "⚡ ON EN PARLE ⚡", "💎 PÉPITE MÉCONNUE 💎"]
 EMOJIS_FIN = ["🔥", "😤", "💯", "🥷", "⚔️", "😭", "👑", "🎌"]
 EMOJIS_PARAGRAPHE = ["💥", "😨", "🤯", "😮‍💨", "👊", "🩸", "⚡", "🖤"]
-# Pour les faits, on utilise des emojis plus neutres
 EMOJIS_PARAGRAPHE_FAITS = ["✨", "🌍", "🔬", "🧠", "🌿", "📚", "💡", "🌐"]
+# Emojis pour les nouvelles catégories
+EMOJIS_PARAGRAPHE_TRISTES = ["😢", "💔", "🕊️", "🌧️", "🥀", "📜"]
+EMOJIS_PARAGRAPHE_CHANCEUX = ["🍀", "✨", "🌟", "🙌", "💫", "🎉"]
 
 NORMAL = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 ITALIQUE = "𝘢𝘣𝘤𝘥𝘦𝘧𝘨𝘩𝘪𝘫𝘬𝘭𝘮𝘯𝘰𝘱𝘲𝘳𝘴𝘵𝘶𝘷𝘸𝘹𝘺𝘻𝘈𝘉𝘊𝘋𝘌𝘍𝘎𝘏𝘐𝘑𝘒𝘓𝘔𝘕𝘖𝘗𝘘𝘙𝘚𝘛𝘜𝘝𝘞𝘟𝘠𝘡𝟢𝟣𝟤𝟥𝟦𝟧𝟨𝟩𝟪𝟫"
@@ -103,41 +115,21 @@ def sans_accents(texte):
     )
 
 
-def categorie_actuelle():
-    """Retourne la catégorie en fonction de l'heure de Paris."""
-    h = (datetime.now(timezone.utc) + timedelta(hours=3)).hour
-    # Plages horaires simplifiées
-    if 6 <= h < 10:
-        return "faits"
-    elif 10 <= h < 12:
-        return "citations"
-    elif 12 <= h < 14:
-        return "faits"
-    elif 14 <= h < 16:
-        return "folklore"
-    elif 16 <= h < 18:
-        return "comparatif"
-    elif 18 <= h < 20:
-        return "faits"
-    elif 20 <= h < 22:
-        return "portraits"
-    elif 22 <= h < 24:
-        return "citations"
-    else:  # 0h - 6h
-        return "retrospectives"
-
-
 def charger_memoire():
+    """Charge la mémoire en s'assurant que toutes les clés existent."""
     if os.path.exists("memoire_publications.json"):
         with open("memoire_publications.json", "r", encoding="utf-8") as f:
             data = json.load(f)
-            # Initialiser les listes si absentes (pour compatibilité)
-            if "mangas_recents" not in data:
-                data["mangas_recents"] = []
-            if "faits_recents" not in data:
-                data["faits_recents"] = []
-            return data
-    return {"mangas_recents": [], "faits_recents": [], "derniere_publication": None}
+    else:
+        data = {}
+    # Initialisation des champs par défaut
+    data.setdefault("mangas_recents", [])
+    data.setdefault("faits_recents", [])
+    data.setdefault("tristes_recents", [])
+    data.setdefault("chanceux_recents", [])
+    data.setdefault("derniere_publication", None)
+    data.setdefault("compteur_manga_jour", {"date": "", "count": 0})
+    return data
 
 
 def sauvegarder_memoire(m):
@@ -192,7 +184,6 @@ def piocher_image_pour_faits(sujet):
         "le sommeil et les rêves": "night sky stars",
         "la nature extrême": "extreme nature landscape",
         "le règne animal": "wildlife animal",
-        # Nouvelles entrées pour le web
         "les secrets de Google": "Google data center technology",
         "les coulisses du web": "internet infrastructure server room",
     }
@@ -234,6 +225,47 @@ def piocher_image_pour_faits(sujet):
     except Exception as e:
         print(f"Erreur Wikimedia pour {sujet}: {e}")
         return None
+
+
+def piocher_image_pour_histoires(categorie):
+    """Recherche une image pour les catégories tristes/chanceux."""
+    if categorie == "tristes":
+        termes = ["sad historical event", "old shipwreck", "tragic monument"]
+    else:  # chanceux
+        termes = ["lucky clover", "lucky charm", "fortune"]
+    headers = {
+        "User-Agent": "LaPiraterieBot/1.0 (contact: ton-email@example.com)"
+    }
+    url = "https://commons.wikimedia.org/w/api.php"
+    for terme in termes:
+        params = {
+            "action": "query",
+            "generator": "search",
+            "gsrsearch": terme,
+            "gsrlimit": 10,
+            "gsrnamespace": 6,
+            "prop": "imageinfo",
+            "iiprop": "url",
+            "iiurlwidth": 1080,
+            "format": "json",
+        }
+        try:
+            r = requests.get(url, params=params, headers=headers, timeout=15)
+            r.raise_for_status()
+            data = r.json()
+            pages = data.get("query", {}).get("pages", {})
+            candidats = []
+            for page in pages.values():
+                infos = page.get("imageinfo", [])
+                if infos:
+                    image_url = infos[0].get("thumburl") or infos[0].get("url")
+                    if image_url and image_url.lower().endswith((".jpg", ".jpeg", ".png")):
+                        candidats.append(image_url)
+            if candidats:
+                return random.choice(candidats)
+        except Exception as e:
+            print(f"Erreur Wikimedia pour {categorie} ({terme}): {e}")
+    return None
 
 
 def generer_texte_gemini(sujet, categorie):
@@ -304,21 +336,18 @@ def telecharger_police():
                 f.write(r.content)
         except Exception as e:
             print(f"Erreur téléchargement police : {e}")
-            # On continue sans police personnalisée, utilisation de la police par défaut plus bas
 
 
 def creer_image_stylee(image_url, titre):
     """Crée une image stylisée avec le titre. Si image_url est None, génère un fond dégradé."""
     telecharger_police()
     if image_url is None:
-        # Image de fond générée (dégradé simple)
         largeur = 1080
         hauteur = 1080
         image = Image.new("RGB", (largeur, hauteur))
         pixels = image.load()
         for y in range(hauteur):
             for x in range(largeur):
-                # Dégradé du bleu nuit au violet
                 r = int(30 + (80 - 30) * (x / largeur))
                 g = int(30 + (50 - 30) * (y / hauteur))
                 b = int(60 + (120 - 60) * ((x + y) / (largeur + hauteur)))
@@ -330,10 +359,8 @@ def creer_image_stylee(image_url, titre):
             image = Image.open(BytesIO(r.content)).convert("RGB")
         except Exception as e:
             print(f"Erreur récupération image : {e}, utilisation fond par défaut")
-            # Image de secours
             image = Image.new("RGB", (1080, 1080), color=(40, 40, 80))
 
-    # Redimensionnement si trop petit
     largeur_cible = 1080
     if image.width < largeur_cible:
         ratio = largeur_cible / image.width
@@ -341,10 +368,7 @@ def creer_image_stylee(image_url, titre):
         image = image.resize(nouvelle_taille, Image.LANCZOS)
 
     dessin = ImageDraw.Draw(image)
-
-    # Taille de police adaptative : on réduit si le texte est trop long
     texte = titre.upper()
-    # Supprimer les accents pour éviter les problèmes de rendu
     texte_sans_accents = sans_accents(texte)
     taille = int(image.width / 8)
     police = None
@@ -360,12 +384,10 @@ def creer_image_stylee(image_url, titre):
             break
         taille -= 5
 
-    # Position en bas, centré
     bbox = dessin.textbbox((0, 0), texte_sans_accents, font=police)
     x = (image.width - (bbox[2] - bbox[0])) / 2
     y = image.height - taille * 2.0
 
-    # Ombre portée
     for dx in range(-3, 4):
         for dy in range(-3, 4):
             dessin.text((x + dx, y + dy), texte_sans_accents, font=police, fill="black")
@@ -378,7 +400,6 @@ def creer_image_stylee(image_url, titre):
 
 
 def styliser_paragraphe(p, categorie):
-    """Stylise un paragraphe : ajoute un emoji et transforme certains mots."""
     mots = p.split(" ")
     candidats = [i for i, m in enumerate(mots) if len(re.sub(r"[^\wéèêàâçùûîï]", "", m)) >= 7 and m.lower().strip(",.!?»«") not in MOTS_A_IGNORER]
     marques = set(random.sample(candidats, min(2, len(candidats)))) if candidats else set()
@@ -390,17 +411,68 @@ def styliser_paragraphe(p, categorie):
             out.append(f"#{propre.upper().translate(TABLE_GRAS)}")
         else:
             out.append(mot_sans_accents.translate(TABLE_ITALIQUE))
-    # Choix d'un emoji selon la catégorie
+    # Choix de l'emoji selon la catégorie
     if categorie == "faits":
         emoji = random.choice(EMOJIS_PARAGRAPHE_FAITS)
+    elif categorie == "tristes":
+        emoji = random.choice(EMOJIS_PARAGRAPHE_TRISTES)
+    elif categorie == "chanceux":
+        emoji = random.choice(EMOJIS_PARAGRAPHE_CHANCEUX)
     else:
         emoji = random.choice(EMOJIS_PARAGRAPHE)
     return emoji + " " + " ".join(out)
 
 
 def styliser_texte(texte, categorie):
-    """Applique la stylisation paragraphe par paragraphe."""
     return "\n\n".join(styliser_paragraphe(p, categorie) for p in texte.split("\n\n") if p.strip())
+
+
+def choisir_categorie(memoire):
+    """Détermine la catégorie à publier selon l'heure et la limite quotidienne de mangas."""
+    now = datetime.now(timezone.utc) + timedelta(hours=3)  # Heure de Paris
+    heure = now.hour
+    date_aujourdhui = now.strftime("%Y-%m-%d")
+
+    # Initialiser le compteur manga du jour
+    compteur = memoire.get("compteur_manga_jour", {"date": "", "count": 0})
+    if compteur.get("date") != date_aujourdhui:
+        compteur = {"date": date_aujourdhui, "count": 0}
+        memoire["compteur_manga_jour"] = compteur
+
+    # Définir une rotation horaire (mais on va d'abord vérifier la limite manga)
+    # Ancienne logique : on choisit une catégorie selon l'heure
+    # On la garde comme base, mais si c'est un manga et que le quota est atteint, on bascule
+    if 6 <= heure < 10:
+        categorie_base = "faits"
+    elif 10 <= heure < 12:
+        categorie_base = "citations"
+    elif 12 <= heure < 14:
+        categorie_base = "faits"
+    elif 14 <= heure < 16:
+        categorie_base = "folklore"
+    elif 16 <= heure < 18:
+        categorie_base = "comparatif"
+    elif 18 <= heure < 20:
+        categorie_base = "faits"
+    elif 20 <= heure < 22:
+        categorie_base = "portraits"
+    elif 22 <= heure < 24:
+        categorie_base = "citations"
+    else:  # 0h - 6h
+        categorie_base = "retrospectives"
+
+    # Si la catégorie de base est un manga et que le quota est atteint, on choisit une non-manga
+    if categorie_base in CATEGORIES_MANGA:
+        if compteur["count"] >= 3:
+            print(f"Quota manga atteint ({compteur['count']}/3), bascule vers catégorie non-manga.")
+            # On choisit aléatoirement parmi les non-manga (on peut pondérer si besoin)
+            categorie_choisie = random.choice(CATEGORIES_NON_MANGA)
+        else:
+            categorie_choisie = categorie_base
+    else:
+        categorie_choisie = categorie_base
+
+    return categorie_choisie
 
 
 def publier(categorie, sujet):
@@ -408,13 +480,15 @@ def publier(categorie, sujet):
     if categorie == "faits":
         image_url = piocher_image_pour_faits(sujet)
         titre_affiche = sujet.capitalize()
+    elif categorie in ["tristes", "chanceux"]:
+        image_url = piocher_image_pour_histoires(categorie)
+        titre_affiche = categorie.capitalize()  # ou un titre plus descriptif
     else:
         image_url = recuperer_image_anilist(sujet)
         titre_affiche = sujet
         if image_url is None:
             return {"error": "image non trouvee"}
 
-    # Si image_url est None pour les faits, on utilise quand même une image de fond générée
     try:
         image_stylee = creer_image_stylee(image_url, titre_affiche)
     except Exception as e:
@@ -444,11 +518,15 @@ def publier(categorie, sujet):
 
 if __name__ == "__main__":
     memoire = charger_memoire()
-    categorie = categorie_actuelle()
+    categorie = choisir_categorie(memoire)
 
     # Sélection de la liste de sujets déjà utilisés selon la catégorie
     if categorie == "faits":
         deja_utilises = memoire.get("faits_recents", [])
+    elif categorie == "tristes":
+        deja_utilises = memoire.get("tristes_recents", [])
+    elif categorie == "chanceux":
+        deja_utilises = memoire.get("chanceux_recents", [])
     else:
         deja_utilises = memoire.get("mangas_recents", [])
 
@@ -459,6 +537,11 @@ if __name__ == "__main__":
         if categorie == "faits":
             dispo = [s for s in SUJETS_FAITS if s not in deja_utilises] or SUJETS_FAITS
             candidat = random.choice(dispo)
+        elif categorie == "tristes":
+            # Pas de liste prédéfinie, on demande à Gemini de choisir une histoire
+            candidat = "une histoire vraie triste du monde"  # le sujet sera traité par Gemini
+        elif categorie == "chanceux":
+            candidat = "une histoire vraie de chance incroyable"
         else:
             candidat = piocher_manga(deja_utilises)
 
@@ -478,8 +561,22 @@ if __name__ == "__main__":
         if categorie == "faits":
             memoire.setdefault("faits_recents", []).append(sujet_retenu)
             memoire["faits_recents"] = memoire["faits_recents"][-150:]
+        elif categorie == "tristes":
+            memoire.setdefault("tristes_recents", []).append(sujet_retenu)
+            memoire["tristes_recents"] = memoire["tristes_recents"][-150:]
+        elif categorie == "chanceux":
+            memoire.setdefault("chanceux_recents", []).append(sujet_retenu)
+            memoire["chanceux_recents"] = memoire["chanceux_recents"][-150:]
         else:
             memoire.setdefault("mangas_recents", []).append(sujet_retenu)
             memoire["mangas_recents"] = memoire["mangas_recents"][-150:]
+            # Incrémenter le compteur manga du jour
+            compteur = memoire.get("compteur_manga_jour", {"date": "", "count": 0})
+            today = (datetime.now(timezone.utc) + timedelta(hours=3)).strftime("%Y-%m-%d")
+            if compteur.get("date") != today:
+                compteur = {"date": today, "count": 0}
+            compteur["count"] += 1
+            memoire["compteur_manga_jour"] = compteur
+
         memoire["derniere_publication"] = datetime.now(timezone.utc).isoformat()
         sauvegarder_memoire(memoire)
