@@ -93,12 +93,12 @@ def recuperer_image_anilist(titre_manga):
         r = requests.post("https://graphql.anilist.co", json={"query": query, "variables": {"search": titre_manga}}, timeout=15)
         media = r.json().get("data", {}).get("Media")
         if media is None or media.get("isAdult"):
+            print(f"AniList : aucune image trouvée pour '{titre_manga}'")
             return None
         return media["coverImage"]["extraLarge"]
     except requests.exceptions.RequestException as e:
         print("Erreur AniList (image):", e)
         return None
-
 
 def chercher_image_wikimedia(mot_cle):
     url = "https://commons.wikimedia.org/w/api.php"
@@ -118,11 +118,13 @@ def chercher_image_wikimedia(mot_cle):
                 u = infos[0].get("thumburl") or infos[0].get("url", "")
                 if u.lower().endswith((".jpg", ".jpeg", ".png")):
                     candidats.append(u)
-        return random.choice(candidats) if candidats else None
+        if not candidats:
+            print(f"Wikimedia : aucune image trouvée pour '{mot_cle}' (pages retournées : {len(pages)})")
+            return None
+        return random.choice(candidats)
     except requests.exceptions.RequestException as e:
         print("Erreur Wikimedia:", e)
         return None
-
 
 def demander_sujet_et_texte_gemini(domaine, deja_utilises):
     consignes_domaine = {
@@ -315,7 +317,8 @@ if __name__ == "__main__":
     resultat = {"error": "aucune tentative"}
 
     for _ in range(4):
-        domaine = random.choice(DOMAINES)
+                domaine = random.choice(DOMAINES)
+        print(f"Domaine tiré : {domaine}")
         if domaine == "anime_manga":
             candidat, resultat = publier_manga(deja_utilises)
         else:
