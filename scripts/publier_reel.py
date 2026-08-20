@@ -226,7 +226,7 @@ def publier_reel(legende):
     etat_final = None
     for _ in range(30):
         time.sleep(10)
-            statut = requests.get(
+        statut = requests.get(
             f"https://graph.facebook.com/v21.0/{video_id}",
             params={"fields": "status", "access_token": PAGE_ACCESS_TOKEN}, timeout=15
         ).json()
