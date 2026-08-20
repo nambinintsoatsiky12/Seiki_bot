@@ -17,7 +17,7 @@ PEXELS_API_KEY = os.environ["PEXELS_API_KEY"]
 
 FONT_URL = "https://github.com/google/fonts/raw/main/ofl/bangers/Bangers-Regular.ttf"
 FONT_PATH = "Bangers-Regular.ttf"
-NB_IMAGES = 5
+NB_IMAGES = 12
 
 MANGAS_CELEBRES = [
     "One Piece", "Naruto", "Attack on Titan", "Demon Slayer", "Jujutsu Kaisen",
@@ -73,7 +73,7 @@ def recuperer_image_anilist(titre_manga):
 def chercher_images_pexels(mot_cle, nombre):
     url = "https://api.pexels.com/v1/search"
     headers = {"Authorization": PEXELS_API_KEY}
-    params = {"query": mot_cle, "per_page": 20, "orientation": "portrait"}
+    params = {"query": mot_cle, "per_page": 30, "orientation": "portrait"}
     try:
         r = requests.get(url, headers=headers, params=params, timeout=15)
         photos = r.json().get("photos", [])
@@ -87,13 +87,15 @@ def chercher_images_pexels(mot_cle, nombre):
 def demander_contenu_gemini(domaine):
     consigne = CONSIGNES_DOMAINE.get(domaine, "un fait vrai et fascinant")
     prompt = (
-        f"Tu es le community manager de 'La piraterie — Omniverses'. Choisis {consigne}.\n"
+        f"Tu es le narrateur d'une chaîne de type documentaire appelée 'Omniverses', au ton posé, "
+        f"captivant et immersif comme un documentaire Netflix. Choisis {consigne}.\n"
         f"Réponds UNIQUEMENT en JSON valide, sans texte autour :\n"
         f'{{"sujet": "nom court en français (3-6 mots)", '
         f'"mot_cle_image": "UN SEUL mot-clé anglais simple et concret photographiable", '
-        f'"narration": "un texte de narration en français, environ 100 à 130 mots, dynamique et captivant, '
-        f'à lire à voix haute pour un Reel vidéo, qui explique ce fait de façon claire et termine par une phrase '
-        f'd\'accroche du type invite à suivre la page ou à commenter"}}'
+        f'"narration": "un texte de narration en français, environ 160 à 200 mots, au ton posé et immersif '
+        f'de documentaire (pas énergique ni familier), qui raconte ce fait avec un vrai sens du récit, '
+        f'phrases fluides et bien rythmées pour être lu à voix haute, et termine par une question ou une '
+        f'invitation calme à réagir en commentaire"}}'
     )
     try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={GEMINI_API_KEY}"
@@ -157,7 +159,7 @@ def preparer_frame(image_url, index, titre=None):
 
 
 def creer_narration_audio(texte):
-    tts = gTTS(text=texte, lang="fr")
+    tts = gTTS(text=texte, lang="fr", slow=False)
     tts.save("narration.mp3")
     resultat = subprocess.run(
         ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", "narration.mp3"],
@@ -166,21 +168,37 @@ def creer_narration_audio(texte):
     try:
         return float(resultat.stdout.strip())
     except ValueError:
-        return 20.0
+        return 30.0
 
 
-def creer_video(chemins_images, duree_totale):
-    duree_par_image = max(duree_totale / len(chemins_images), 2.0)
-    with open("liste_images.txt", "w") as f:
-        for chemin in chemins_images:
-            f.write(f"file '{chemin}'\nduration {duree_par_image}\n")
-        f.write(f"file '{chemins_images[-1]}'\n")
+def creer_clip_avec_zoom(chemin_image, index, duree):
+    fps = 25
+    nb_frames = max(int(duree * fps), fps)
+    sortie = f"clip_{index}.mp4"
+    commande = [
+        "ffmpeg", "-y", "-loop", "1", "-i", chemin_image,
+        "-vf", f"scale=1080:1920,zoompan=z='min(zoom+0.0008,1.12)':d={nb_frames}:s=1080x1920:fps={fps},format=yuv420p",
+        "-t", str(duree), "-r", str(fps), "-c:v", "libx264", "-pix_fmt", "yuv420p",
+        sortie
+    ]
+    subprocess.run(commande, check=True, capture_output=True, text=True)
+    return sortie
+
+
+def assembler_video(clips, duree_narration):
+    with open("liste_clips.txt", "w") as f:
+        for clip in clips:
+            f.write(f"file '{clip}'\n")
 
     subprocess.run([
-        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", "liste_images.txt",
-        "-i", "narration.mp3", "-vf", "scale=1080:1920,format=yuv420p",
-        "-r", "25", "-c:v", "libx264", "-c:a", "aac", "-shortest",
-        "-movflags", "+faststart", "reel.mp4"
+        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", "liste_clips.txt",
+        "-c", "copy", "video_muette.mp4"
+    ], check=True, capture_output=True, text=True)
+
+    subprocess.run([
+        "ffmpeg", "-y", "-i", "video_muette.mp4", "-i", "narration.mp3",
+        "-c:v", "copy", "-c:a", "aac", "-shortest", "-movflags", "+faststart",
+        "reel.mp4"
     ], check=True, capture_output=True, text=True)
 
 
@@ -201,12 +219,12 @@ def publier_reel(legende):
 
     r2 = requests.post(
         upload_url, headers={"Authorization": f"OAuth {PAGE_ACCESS_TOKEN}", "file_offset": "0"},
-        data=contenu, timeout=90
+        data=contenu, timeout=120
     )
     print("Résultat upload binaire:", r2.status_code, r2.text[:500])
 
     etat_final = None
-    for _ in range(15):
+    for _ in range(18):
         time.sleep(5)
         statut = requests.get(
             f"https://graph.facebook.com/v21.0/{video_id}",
@@ -238,7 +256,12 @@ if __name__ == "__main__":
         titre = manga_direct
         image_url = recuperer_image_anilist(titre)
         images_urls = [image_url] * NB_IMAGES if image_url else []
-        narration = f"On parle de {titre} aujourd'hui, une œuvre incontournable de l'univers manga et anime. Suivez la page pour découvrir encore plus de contenu sur cet univers passionnant !"
+        narration = (
+            f"Aujourd'hui, plongeons dans l'univers de {titre}, une œuvre qui a marqué durablement le monde "
+            f"du manga et de l'animation japonaise. Son histoire, ses personnages et son ambiance continuent "
+            f"d'attirer des millions de fans à travers le monde. Si cet univers vous intrigue, suivez la page "
+            f"pour découvrir bien d'autres récits fascinants."
+        )
         legende = f"🔥 {titre} — vous en pensez quoi ? 👇"
     else:
         infos = demander_contenu_gemini(domaine)
@@ -254,9 +277,15 @@ if __name__ == "__main__":
         print("Aucune image trouvée, Reel annulé.")
     else:
         try:
-            duree = creer_narration_audio(narration)
-            chemins = [preparer_frame(u, i, titre if i == 0 else None) for i, u in enumerate(images_urls)]
-            creer_video(chemins, duree)
+            duree_totale = creer_narration_audio(narration)
+            duree_par_image = max(duree_totale / len(images_urls), 3.0)
+
+            clips = []
+            for i, url in enumerate(images_urls):
+                chemin_image = preparer_frame(url, i, titre if i == 0 else None)
+                clips.append(creer_clip_avec_zoom(chemin_image, i, duree_par_image))
+
+            assembler_video(clips, duree_totale)
             resultat = publier_reel(legende)
             print("Résultat final:", resultat)
         except subprocess.CalledProcessError as e:
