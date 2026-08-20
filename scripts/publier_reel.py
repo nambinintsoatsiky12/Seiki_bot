@@ -224,9 +224,9 @@ def publier_reel(legende):
     print("Résultat upload binaire:", r2.status_code, r2.text[:500])
 
     etat_final = None
-    for _ in range(18):
-        time.sleep(5)
-        statut = requests.get(
+    for _ in range(30):
+        time.sleep(10)
+            statut = requests.get(
             f"https://graph.facebook.com/v21.0/{video_id}",
             params={"fields": "status", "access_token": PAGE_ACCESS_TOKEN}, timeout=15
         ).json()
