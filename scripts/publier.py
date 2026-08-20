@@ -101,31 +101,39 @@ def recuperer_image_anilist(titre_manga):
         return None
 
 def chercher_image_wikimedia(mot_cle):
-    url = "https://commons.wikimedia.org/w/api.php"
-    params = {
-        "action": "query", "generator": "search", "gsrsearch": f"{mot_cle} filetype:bitmap",
-        "gsrlimit": 15, "gsrnamespace": 6, "prop": "imageinfo", "iiprop": "url",
-        "iiurlwidth": 1080, "format": "json",
-    }
-    headers = {"User-Agent": "LaPiraterieBot/1.0 (contact: bot@lapiraterie.example)"}
-    try:
-        r = requests.get(url, params=params, headers=headers, timeout=15)
-        pages = r.json().get("query", {}).get("pages", {})
-        candidats = []
-        for page in pages.values():
-            infos = page.get("imageinfo", [])
-            if infos:
-                u = infos[0].get("thumburl") or infos[0].get("url", "")
-                if u.lower().endswith((".jpg", ".jpeg", ".png")):
-                    candidats.append(u)
-        if not candidats:
-            print(f"Wikimedia : aucune image trouvée pour '{mot_cle}' (pages retournées : {len(pages)})")
-            return None
-        return random.choice(candidats)
-    except requests.exceptions.RequestException as e:
-        print("Erreur Wikimedia:", e)
-        return None
+    def rechercher(terme):
+        url = "https://commons.wikimedia.org/w/api.php"
+        params = {
+            "action": "query", "generator": "search", "gsrsearch": terme,
+            "gsrlimit": 30, "gsrnamespace": 6, "prop": "imageinfo", "iiprop": "url",
+            "iiurlwidth": 1080, "format": "json",
+        }
+        headers = {"User-Agent": "LaPiraterieBot/1.0 (contact: bot@lapiraterie.example)"}
+        try:
+            r = requests.get(url, params=params, headers=headers, timeout=15)
+            pages = r.json().get("query", {}).get("pages", {})
+            candidats = []
+            for page in pages.values():
+                infos = page.get("imageinfo", [])
+                if infos:
+                    u = infos[0].get("thumburl") or infos[0].get("url", "")
+                    if u.lower().endswith((".jpg", ".jpeg", ".png", ".webp", ".gif")):
+                        candidats.append(u)
+            print(f"Wikimedia '{terme}' : {len(pages)} pages, {len(candidats)} images valides")
+            return candidats
+        except requests.exceptions.RequestException as e:
+            print(f"Erreur Wikimedia '{terme}':", e)
+            return []
 
+    candidats = rechercher(mot_cle)
+    if not candidats:
+        premier_mot = mot_cle.split(",")[0].split(" ")[0]
+        candidats = rechercher(premier_mot)
+    if not candidats:
+        candidats = rechercher("nature science")
+
+    return random.choice(candidats) if candidats else None
+    
 def demander_sujet_et_texte_gemini(domaine, deja_utilises):
     consignes_domaine = {
         "sciences": "une découverte ou un fait scientifique réel et fascinant",
@@ -141,6 +149,7 @@ def demander_sujet_et_texte_gemini(domaine, deja_utilises):
         "exploration": "un fait vrai sur une grande expédition ou exploration réelle",
         "langues": "un fait fascinant et vrai sur une langue ou l'origine d'un mot",
         "web": "un fait vrai et peu connu sur Internet, Google, ou les coulisses du web",
+        "animé": "des nouvelles animé qui vien de sortir",
     }
     consigne = consignes_domaine.get(domaine, "un fait vrai et fascinant")
     eviter = ", ".join(deja_utilises[-20:]) if deja_utilises else "aucun"
@@ -151,7 +160,7 @@ def demander_sujet_et_texte_gemini(domaine, deja_utilises):
         f"Choisis {consigne}. Évite ces sujets déjà utilisés récemment : {eviter}.\n\n"
         f"Réponds UNIQUEMENT en JSON valide, sans texte autour, avec ce format exact :\n"
         f'{{"sujet": "nom court du sujet en français (3-6 mots)", '
-        f'"mot_cle_image": "2-3 mots-clés en anglais pour chercher une photo pertinente", '
+        f'"mot_cle_image": "UN SEUL mot-clé anglais simple et concret désignant un objet/lieu/être vivant photographiable (pas de mots abstraits ni de combinaisons bizarres)", '
         f'"texte": "le post Facebook complet en français, 3 à 5 paragraphes, qui commence par \'Le savais-tu ?\' '
         f'et se termine par une question qui invite au commentaire. Reste factuel, vérifié, jamais inventé. '
         f'Ne parle jamais de personnes réelles vivantes en détail, ni de violence, torture ou tragédies précises. '
