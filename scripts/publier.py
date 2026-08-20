@@ -11,6 +11,7 @@ from PIL import Image, ImageDraw, ImageFont
 PAGE_ACCESS_TOKEN = os.environ["PAGE_ACCESS_TOKEN"]
 PAGE_ID = os.environ["PAGE_ID"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
+PEXELS_API_KEY = os.environ["PEXELS_API_KEY"]
 
 FONT_URL = "https://github.com/google/fonts/raw/main/ofl/bangers/Bangers-Regular.ttf"
 FONT_PATH = "Bangers-Regular.ttf"
@@ -100,40 +101,24 @@ def recuperer_image_anilist(titre_manga):
         print("Erreur AniList (image):", e)
         return None
 
-def chercher_image_wikimedia(mot_cle):
-    def rechercher(terme):
-        url = "https://commons.wikimedia.org/w/api.php"
-        params = {
-            "action": "query", "generator": "search", "gsrsearch": terme,
-            "gsrlimit": 30, "gsrnamespace": 6, "prop": "imageinfo", "iiprop": "url",
-            "iiurlwidth": 1080, "format": "json",
-        }
-        headers = {"User-Agent": "LaPiraterieBot/1.0 (contact: bot@lapiraterie.example)"}
-        try:
-            r = requests.get(url, params=params, headers=headers, timeout=15)
-            pages = r.json().get("query", {}).get("pages", {})
-            candidats = []
-            for page in pages.values():
-                infos = page.get("imageinfo", [])
-                if infos:
-                    u = infos[0].get("thumburl") or infos[0].get("url", "")
-                    if u.lower().endswith((".jpg", ".jpeg", ".png", ".webp", ".gif")):
-                        candidats.append(u)
-            print(f"Wikimedia '{terme}' : {len(pages)} pages, {len(candidats)} images valides")
-            return candidats
-        except requests.exceptions.RequestException as e:
-            print(f"Erreur Wikimedia '{terme}':", e)
-            return []
 
-    candidats = rechercher(mot_cle)
-    if not candidats:
-        premier_mot = mot_cle.split(",")[0].split(" ")[0]
-        candidats = rechercher(premier_mot)
-    if not candidats:
-        candidats = rechercher("nature science")
+def chercher_image_pexels(mot_cle):
+    url = "https://api.pexels.com/v1/search"
+    headers = {"Authorization": PEXELS_API_KEY}
+    params = {"query": mot_cle, "per_page": 15, "orientation": "square"}
+    try:
+        r = requests.get(url, headers=headers, params=params, timeout=15)
+        photos = r.json().get("photos", [])
+        if not photos:
+            print(f"Pexels : aucune image pour '{mot_cle}'")
+            return None
+        photo = random.choice(photos)
+        return photo["src"]["large"]
+    except requests.exceptions.RequestException as e:
+        print("Erreur Pexels:", e)
+        return None
 
-    return random.choice(candidats) if candidats else None
-    
+
 def demander_sujet_et_texte_gemini(domaine, deja_utilises):
     consignes_domaine = {
         "sciences": "une découverte ou un fait scientifique réel et fascinant",
@@ -149,7 +134,6 @@ def demander_sujet_et_texte_gemini(domaine, deja_utilises):
         "exploration": "un fait vrai sur une grande expédition ou exploration réelle",
         "langues": "un fait fascinant et vrai sur une langue ou l'origine d'un mot",
         "web": "un fait vrai et peu connu sur Internet, Google, ou les coulisses du web",
-        "animé": "des nouvelles animé qui vien de sortir",
     }
     consigne = consignes_domaine.get(domaine, "un fait vrai et fascinant")
     eviter = ", ".join(deja_utilises[-20:]) if deja_utilises else "aucun"
@@ -275,8 +259,7 @@ def publier_manga(deja_utilises):
     return manga, finaliser_et_publier(manga, image_url, texte_brut)
 
 
-def publier_fait(deja_utilises):
-    domaine = random.choice(DOMAINES[1:])
+def publier_fait(deja_utilises, domaine):
     resultat_gemini = demander_sujet_et_texte_gemini(domaine, deja_utilises)
     if resultat_gemini is None:
         return None, {"error": "gemini indisponible"}
@@ -285,7 +268,9 @@ def publier_fait(deja_utilises):
     if sujet in deja_utilises:
         return None, {"error": "sujet deja utilise"}
 
-    image_url = chercher_image_wikimedia(resultat_gemini["mot_cle_image"])
+    image_url = chercher_image_pexels(resultat_gemini["mot_cle_image"])
+    if image_url is None:
+        image_url = chercher_image_pexels("nature landscape")
     if image_url is None:
         return None, {"error": "image non trouvee"}
 
@@ -331,7 +316,7 @@ if __name__ == "__main__":
         if domaine == "anime_manga":
             candidat, resultat = publier_manga(deja_utilises)
         else:
-            candidat, resultat = publier_fait(deja_utilises)
+            candidat, resultat = publier_fait(deja_utilises, domaine)
 
         if candidat and "error" not in resultat:
             sujet_retenu = candidat
