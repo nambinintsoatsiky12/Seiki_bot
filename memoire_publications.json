@@ -169,7 +169,7 @@
     "Solo Leveling",
     "Attack on Titan"
   ],
-  "derniere_publication": "2026-08-19T18:42:23.645383+00:00",
+  "derniere_publication": "2026-08-20T04:57:24.918956+00:00",
   "faits_recents": [
     "le sommeil et les rêves",
     "les coulisses du web",
@@ -201,5 +201,8 @@
   "compteur_manga_jour": {
     "date": "2026-08-19",
     "count": 3
-  }
+  },
+  "sujets_recents": [
+    "Fairy Tail"
+  ]
 }
