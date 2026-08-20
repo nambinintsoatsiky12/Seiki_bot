@@ -317,7 +317,7 @@ if __name__ == "__main__":
     resultat = {"error": "aucune tentative"}
 
     for _ in range(4):
-                domaine = random.choice(DOMAINES)
+        domaine = random.choice(DOMAINES)
         print(f"Domaine tiré : {domaine}")
         if domaine == "anime_manga":
             candidat, resultat = publier_manga(deja_utilises)
