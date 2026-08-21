@@ -1,7 +1,7 @@
 name: Publication automatique
 on:
   schedule:
-    - cron: '0 * * * *'
+        - cron: '0 9,21 * * *'
   workflow_dispatch:
 
 jobs:
